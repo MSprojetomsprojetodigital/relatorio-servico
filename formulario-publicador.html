@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Relatório de Serviço</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream:#F5F0E8;--ink:#1A1714;--warm:#8B5E3C;--gold:#C9A84C;
+    --sage:#5C7A6B;--dust:#D4C5B0;--red:#C0392B;--border:#E0D8CC;--card:#FDFAF5;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);min-height:100vh;font-size:14px;}
+
+  .header{background:var(--ink);color:var(--cream);padding:16px 20px;text-align:center;}
+  .header h1{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:600;}
+  .header p{font-size:10px;color:var(--dust);margin-top:3px;letter-spacing:1.2px;text-transform:uppercase;}
+  .month-badge{display:inline-block;background:var(--gold);color:var(--ink);padding:3px 12px;border-radius:12px;font-size:11px;font-weight:500;margin-top:6px;}
+
+  .container{padding:20px 20px 60px;max-width:480px;margin:0 auto;}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
+  .card-title{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+
+  .form-row{margin-bottom:14px;}
+  label{display:block;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:1px;color:var(--warm);margin-bottom:5px;}
+  select,input[type=number],textarea{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--ink);background:white;appearance:none;}
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--gold);}
+  textarea{resize:vertical;min-height:70px;}
+
+  .toggle-group{display:flex;gap:8px;}
+  .toggle-btn{flex:1;padding:11px;border:1.5px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;color:#888;text-align:center;transition:all 0.2s;}
+  .toggle-btn.active-yes{border-color:var(--sage);background:#EAF2EE;color:var(--sage);}
+  .toggle-btn.active-no{border-color:var(--red);background:#FDECEA;color:var(--red);}
+
+  .pill-group{display:flex;gap:8px;flex-wrap:wrap;}
+  .pill{padding:8px 14px;border:1.5px solid var(--border);border-radius:20px;background:white;cursor:pointer;font-size:13px;color:#888;transition:all 0.2s;}
+  .pill.active{border-color:var(--gold);background:#FBF5E5;color:var(--warm);font-weight:500;}
+
+  .numeric-fields{display:none;}
+  .numeric-fields.visible{display:block;animation:fadeIn 0.3s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+  .horas-row{display:none;}
+
+  .btn-enviar{width:100%;padding:15px;background:var(--ink);color:var(--cream);border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;margin-top:4px;}
+  .btn-enviar:active{background:#333;}
+
+  /* SUCESSO */
+  .success-screen{display:none;text-align:center;padding:40px 20px;}
+  .success-screen .icon{font-size:52px;margin-bottom:12px;}
+  .success-screen h2{font-family:'Cormorant Garamond',serif;font-size:23px;margin-bottom:8px;}
+  .success-screen p{font-size:13px;color:#777;}
+  .success-detail{margin-top:16px;padding:12px 16px;background:#EAF2EE;border-radius:10px;font-size:13px;color:var(--sage);font-weight:500;line-height:1.6;}
+  .btn-novo{margin-top:20px;padding:11px 26px;background:transparent;border:2px solid var(--ink);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;color:var(--ink);}
+
+  /* AVISO sem grupos */
+  .aviso{background:#FBF5E5;border:1px solid var(--gold);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--warm);text-align:center;}
+
+  .rodape{text-align:center;font-size:10px;color:#bbb;margin-top:20px;}
+</style>
+<!-- ===== NUVEM (Firebase Realtime Database) ===== -->
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+(function () {
+  // A configuracao de cada congregacao fica no arquivo config.js
+  var CFG = window.CONFIG_FIREBASE || null;
+  var CFG_OK = !!(CFG && CFG.apiKey && CFG.databaseURL &&
+    JSON.stringify(CFG).indexOf('COLE_AQUI') < 0);
+  var DONO = (typeof window.CONFIG_DONO_UID === 'string' && window.CONFIG_DONO_UID.indexOf('COLE') < 0)
+    ? window.CONFIG_DONO_UID : null;
+  // Chaves do aparelho que sao compartilhadas na nuvem.
+  // S-21 (dados pessoais) e PIN NAO entram aqui: ficam so no aparelho.
+  var K = {
+    membros: 'membros_grupos', relatorios: 'relatorios_servico', s3: 's3_dados',
+    s88: 's88_dados', cong: 's3_congregacao', link: 'link_publicador', s21: 's21_dados'
+  };
+  // Listas do Admin: cada item fica separado na nuvem (pelo seu id)
+  var LISTAS = { inativos: 'lista_inativos', contatos: 'lista_contatos', remocoes: 'lista_remocoes', visitas61: 'lista_visitas61' };
+  var listaVista = {};
+  var adminNuvem = false;   // logado com e-mail/senha de administrador
+  var assinados = {}, seedFeito = false, auth = null;
+  function uidAtual() { return (auth && auth.currentUser) ? auth.currentUser.uid : null; }
+  // Responsavel = conta do config.js. Ajudantes = outras contas autorizadas (so leitura).
+  function ehDono() { return adminNuvem && (!DONO || uidAtual() === DONO); }
+  function caminhosDoPapel() {
+    if (!adminNuvem) return ['membros', 's3', 'config'];
+    var c = ['membros', 'relatorios', 's3', 's88', 'config', 's21', 'inativos', 'contatos', 'remocoes', 'visitas61'];
+    c.push(ehDono() ? 'acesso' : 'acesso/chave'); // ajudantes so leem a chave (embaralhada)
+    return c;
+  }
+
+  var origSet = Storage.prototype.setItem;
+  var origGet = Storage.prototype.getItem;
+  var cache = { membros: null, relatorios: {}, s3: {}, s88: null, cong: null, link: null, acesso: {}, s21: {}, listas: { inativos: {}, contatos: {}, remocoes: {}, visitas61: {} } };
+  var recebido = {};
+  var db = null;
+
+  var N = window.NUVEM = {
+    pronto: false, online: false, ouvintes: [], adminNuvem: false,
+    aoAtualizar: function (fn) {
+      this.ouvintes.push(fn);
+      if (this.pronto) { try { fn(true); } catch (e) { console.warn(e); } }
+    }
+  };
+
+  function avisar(primeira) {
+    N.ouvintes.forEach(function (fn) { try { fn(primeira); } catch (e) { console.warn(e); } });
+  }
+
+  function pinAberto() {
+    try { return typeof adminUnlocked === 'undefined' || adminUnlocked === true; } catch (e) { return true; }
+  }
+  function ehAdmin() { return adminNuvem && pinAberto(); }
+
+  // ---- Indicador de conexao (canto inferior) ----
+  function status(texto, cor) {
+    function pintar() {
+      var el = document.getElementById('nuvemStatus');
+      if (!el) { el = document.createElement('div'); el.id = 'nuvemStatus'; }
+      var slot = document.getElementById('nuvemStatusSlot');
+      if (slot) {
+        if (el.parentNode !== slot) slot.appendChild(el);
+        el.style.cssText = 'display:inline-block;padding:6px 13px;border-radius:16px;' +
+          'font:600 12px DM Sans,Arial,sans-serif;color:#fff;white-space:nowrap';
+      } else {
+        if (el.parentNode !== document.body) document.body.appendChild(el);
+        el.style.cssText = 'position:fixed;right:10px;top:calc(10px + env(safe-area-inset-top,0px));' +
+          'z-index:9999;padding:6px 13px;border-radius:16px;font:600 12px DM Sans,Arial,sans-serif;' +
+          'color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none';
+      }
+      el.textContent = '\u25CF ' + texto;
+      el.style.background = cor;
+    }
+    if (document.body) pintar(); else document.addEventListener('DOMContentLoaded', pintar);
+  }
+
+  function chaveRel(r) {
+    var d = new Date(r.envio);
+    return String(r.id) + '_' + d.getFullYear() + '_' + (d.getMonth() + 1);
+  }
+
+  // ---- Nuvem -> aparelho ----
+  function aplicarLocal() {
+    if (cache.membros !== null) origSet.call(localStorage, K.membros, cache.membros);
+    if (recebido.relatorios) {
+    var arr = [];
+    Object.keys(cache.relatorios).forEach(function (k) {
+      var v = cache.relatorios[k];
+      if (typeof v !== 'string') return;
+      try { arr.push(JSON.parse(v)); } catch (e) {}
+    });
+    arr.sort(function (a, b) { return new Date(a.envio) - new Date(b.envio); });
+    origSet.call(localStorage, K.relatorios, JSON.stringify(arr));
+    }
+    var s3 = {};
+    Object.keys(cache.s3).forEach(function (k) {
+      try { s3[k] = JSON.parse(cache.s3[k]); } catch (e) {}
+    });
+    // Nuvem vazia antes da primeira subida: nao apaga o S-3 guardado no aparelho
+    var s3Local = origGet.call(localStorage, K.s3);
+    if (Object.keys(s3).length || seedFeito || !s3Local || s3Local === '{}') origSet.call(localStorage, K.s3, JSON.stringify(s3));
+    if (recebido.s88 && cache.s88 !== null) origSet.call(localStorage, K.s88, cache.s88);
+    Object.keys(LISTAS).forEach(function (nome) {
+      if (!recebido[nome]) return;
+      var arr = [];
+      Object.keys(cache.listas[nome]).forEach(function (k) { try { arr.push(JSON.parse(cache.listas[nome][k])); } catch (e) {} });
+      arr.sort(function (a, b) { return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt'); });
+      // Primeira carga nesta sessao, nuvem vazia e aparelho do responsavel com dados:
+      // sobe a lista uma unica vez. Depois disso a nuvem sempre manda
+      // (assim um item apagado nao volta de outro aparelho).
+      var primeiraVez = !listaVista[nome];
+      listaVista[nome] = true;
+      if (!arr.length && primeiraVez && ehDono()) {
+        var loc = origGet.call(localStorage, LISTAS[nome]);
+        if (loc && loc !== '[]') { enviarLista(nome, loc); return; }
+      }
+      origSet.call(localStorage, LISTAS[nome], JSON.stringify(arr));
+    });
+    if (recebido.s21) {
+      var s21 = {}, soLocal = {};
+      Object.keys(cache.s21).forEach(function (k) { try { s21[k] = JSON.parse(cache.s21[k]); } catch (e) {} });
+      try {
+        var loc = JSON.parse(origGet.call(localStorage, K.s21) || '{}') || {};
+        Object.keys(loc).forEach(function (k) { if (!(k in s21)) { s21[k] = loc[k]; soLocal[k] = loc[k]; } });
+      } catch (e) {}
+      origSet.call(localStorage, K.s21, JSON.stringify(s21));
+      if (Object.keys(soLocal).length) enviarS21(JSON.stringify(soLocal)); // primeira vez: sobe o S-21 deste aparelho
+    }
+    if (cache.cong !== null) origSet.call(localStorage, K.cong, cache.cong);
+    if (cache.link !== null) origSet.call(localStorage, K.link, cache.link);
+  }
+
+  // ---- Aparelho -> nuvem (so envia o que mudou) ----
+  function erro(e) { console.warn('Nuvem:', e); status('Erro ao salvar na nuvem', '#C0392B'); }
+
+  function enviarRelatorios(valor, permitirApagar) {
+    var arr; try { arr = JSON.parse(valor) || []; } catch (e) { return; }
+    var upd = {}, presentes = {}, mudou = false;
+    arr.forEach(function (r) {
+      var k = chaveRel(r), s = JSON.stringify(r);
+      presentes[k] = true;
+      if (cache.relatorios[k] !== s) { upd[k] = s; cache.relatorios[k] = s; mudou = true; }
+    });
+    // Apagar relatorios so e permitido no modo Admin (evita que um
+    // celular com lista antiga apague o relatorio de outra pessoa)
+    if (permitirApagar) {
+      Object.keys(cache.relatorios).forEach(function (k) {
+        if (!presentes[k]) { upd[k] = null; delete cache.relatorios[k]; mudou = true; }
+      });
+    }
+    if (mudou) db.ref('relatorios').update(upd).catch(erro);
+  }
+
+  function enviarS3(valor) {
+    var obj; try { obj = JSON.parse(valor) || {}; } catch (e) { return; }
+    var upd = {}, mudou = false;
+    Object.keys(obj).forEach(function (k) {
+      var s = JSON.stringify(obj[k]);
+      if (cache.s3[k] !== s) { upd[k] = s; cache.s3[k] = s; mudou = true; }
+    });
+    if (mudou) db.ref('s3').update(upd).catch(erro);
+  }
+
+  function enviarS21(valor) {
+    if (!adminNuvem) return;
+    var obj; try { obj = JSON.parse(valor) || {}; } catch (e) { return; }
+    var upd = {}, mudou = false;
+    Object.keys(obj).forEach(function (k) {
+      if (!/^[A-Za-z0-9_-]+$/.test(k)) return;
+      var sv = JSON.stringify(obj[k]);
+      if (cache.s21[k] !== sv) { upd[k] = sv; cache.s21[k] = sv; mudou = true; }
+    });
+    if (mudou) db.ref('s21').update(upd).catch(erro);
+  }
+
+  function podeLista(nome) { return adminNuvem; }
+  function enviarLista(nome, valor) {
+    if (!podeLista(nome)) return;
+    var arr; try { arr = JSON.parse(valor) || []; } catch (e) { return; }
+    var c = cache.listas[nome], upd = {}, mudou = false;
+    arr.forEach(function (it) {
+      if (!it || it.id === undefined || !/^[A-Za-z0-9_-]+$/.test(String(it.id))) return;
+      var k = String(it.id), sv = JSON.stringify(it);
+      if (c[k] !== sv) { upd[k] = sv; c[k] = sv; mudou = true; }
+    });
+    if (mudou) db.ref(nome).update(upd).catch(erro);
+  }
+
+  function enviarSimples(caminho, campo, valor) {
+    if (cache[campo] === valor) return;
+    cache[campo] = valor;
+    db.ref(caminho).set(valor).catch(erro);
+  }
+
+  Storage.prototype.setItem = function (k, v) {
+    origSet.call(this, k, v);
+    if (this !== window.localStorage || !N.pronto || !db) return;
+    try {
+      if (k === K.relatorios) enviarRelatorios(v, ehAdmin());
+      else if (k === K.s3) enviarS3(v);
+      else if (k === K.s21) enviarS21(v);
+      else if (k === K.membros) { if (ehAdmin()) enviarSimples('membros', 'membros', v); }
+      else if (k === K.s88) { if (adminNuvem) enviarSimples('s88', 's88', v); }
+      else if (k === K.cong) { if (adminNuvem) enviarSimples('config/congregacao', 'cong', v); }
+      else if (k === K.link) { if (adminNuvem) enviarSimples('config/link', 'link', v); }
+      else {
+        for (var nome in LISTAS) if (LISTAS[nome] === k) enviarLista(nome, v);
+      }
+    } catch (e) { console.warn(e); }
+  };
+
+  // ---- Primeira carga ----
+  function seedSeVazio() {
+    if (seedFeito || !adminNuvem) return;
+    seedFeito = true;
+    // Banco vazio + aparelho com dados = primeira vez: sobe os dados do aparelho
+    var localM = origGet.call(localStorage, K.membros);
+    if (cache.membros === null && localM && localM !== '{}') {
+      enviarSimples('membros', 'membros', localM);
+      var r = origGet.call(localStorage, K.relatorios); if (r) enviarRelatorios(r, false);
+      var s = origGet.call(localStorage, K.s3); if (s) enviarS3(s);
+      var s88 = origGet.call(localStorage, K.s88); if (s88) enviarSimples('s88', 's88', s88);
+      var c = origGet.call(localStorage, K.cong); if (c) enviarSimples('config/congregacao', 'cong', c);
+      var l = origGet.call(localStorage, K.link); if (l) enviarSimples('config/link', 'link', l);
+    }
+  }
+
+  function pintarOnline() {
+    status(!adminNuvem ? 'Online' : (ehDono() ? 'Online - Responsável' : 'Online - Ajudante'), '#5C7A6B');
+  }
+
+  function iniciar() {
+    N.pronto = true;
+    N.online = true;
+    seedSeVazio();
+    aplicarLocal();
+    pintarOnline();
+    avisar(true);
+  }
+
+  function semNuvem(motivo) {
+    if (N.pronto) return;
+    console.warn('Nuvem indisponível:', motivo);
+    N.pronto = true; N.online = false; db = null;
+    status(motivo === 'permissao' ? 'Banco sem permissão: confira as regras' : 'Offline: dados só neste aparelho', '#C0392B');
+    avisar(true);
+  }
+
+  function prontoPapel() {
+    return caminhosDoPapel().every(function (x) { return recebido[x]; });
+  }
+
+  function assinar(c) {
+    if (assinados[c]) return;
+    assinados[c] = true;
+    db.ref(c).on('value', function (snap) {
+      var v = snap.val();
+      if (c === 'membros') cache.membros = (typeof v === 'string') ? v : null;
+      else if (c === 'relatorios') cache.relatorios = (v && typeof v === 'object') ? v : {};
+      else if (c === 's3') cache.s3 = (v && typeof v === 'object') ? v : {};
+      else if (c === 's88') cache.s88 = (typeof v === 'string') ? v : null;
+      else if (c === 'config') {
+        cache.cong = (v && typeof v.congregacao === 'string') ? v.congregacao : null;
+        cache.link = (v && typeof v.link === 'string') ? v.link : null;
+      }
+      else if (c === 'acesso') cache.acesso = (v && typeof v === 'object') ? v : {};
+      else if (c === 'acesso/chave') { cache.acesso = cache.acesso || {}; if (typeof v === 'string') cache.acesso.chave = v; else delete cache.acesso.chave; }
+      else if (c === 's21') cache.s21 = (v && typeof v === 'object') ? v : {};
+      else if (LISTAS[c]) cache.listas[c] = (v && typeof v === 'object') ? v : {};
+      recebido[c] = true;
+      if (!N.pronto) {
+        if (prontoPapel()) iniciar();
+      } else if (N.online) {
+        // Espera chegarem todas as partes antes de mexer no aparelho
+        // (evita apagar dados locais antes de subirem na primeira vez)
+        if (!prontoPapel()) return;
+        seedSeVazio();
+        aplicarLocal();
+        avisar(false);
+      }
+    }, function (e) {
+      var perm = e && /permission/i.test(String(e.message || e.code));
+      if (!N.pronto) semNuvem(perm ? 'permissao' : e);
+      else if (perm && adminNuvem && !ehDono()) status('Conta não autorizada: peça ao responsável', '#C0392B');
+      else status(perm ? 'Sem permissão para ler ' + ({relatorios:'relatórios', s88:'S-88', membros:'grupos', s3:'S-3', config:'configurações', s21:'S-21', 'acesso/chave':'a chave', inativos:'inativos', contatos:'contatos', remocoes:'remoções', visitas61:'S-61'}[c] || c) : 'Erro de conexão', '#C0392B');
+    });
+  }
+
+  function conectar() {
+    caminhosDoPapel().forEach(assinar);
+  }
+
+  // ---- Login do administrador (e-mail e senha do Firebase) ----
+  N.pedirLogin = function (aoEntrar, opc) {
+    opc = opc || {};
+    if (!auth || document.getElementById('nuvemLogin')) return false;
+    if (adminNuvem && !opc.forcar) return false;
+    var bg = document.createElement('div');
+    bg.id = 'nuvemLogin';
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(26,23,20,.7);z-index:2147483000;display:flex;' +
+      'align-items:center;justify-content:center;padding:20px;font-family:DM Sans,Arial,sans-serif';
+    var est = 'width:100%;padding:11px 12px;border:1.5px solid #E0D8CC;border-radius:8px;font-size:15px;margin-top:4px;box-sizing:border-box';
+    bg.innerHTML = '<div style="background:#FDFAF5;border-radius:14px;padding:24px;width:100%;max-width:330px;box-shadow:0 8px 32px rgba(0,0,0,.3)">' +
+      '<div style="font-size:18px;font-weight:600;margin-bottom:4px;color:#1A1714">' + (opc.titulo || 'Login do administrador') + '</div>' +
+      '<div style="font-size:12px;color:#888;margin-bottom:16px">' + (opc.texto || 'Necessário uma vez neste aparelho para ver os relatórios da congregação.') + '</div>' +
+      '<label style="font-size:11px;font-weight:600;color:#8B5E3C;text-transform:uppercase;letter-spacing:1px">E-mail</label>' +
+      '<input id="nuvemEmail" type="email" autocomplete="username" style="' + est + '">' +
+      '<label style="display:block;margin-top:12px;font-size:11px;font-weight:600;color:#8B5E3C;text-transform:uppercase;letter-spacing:1px">Senha</label>' +
+      '<input id="nuvemSenha" type="password" autocomplete="current-password" style="' + est + '">' +
+      '<div id="nuvemErro" style="color:#C0392B;font-size:12px;margin-top:8px;display:none"></div>' +
+      '<div style="display:flex;gap:8px;margin-top:16px">' +
+      '<button id="nuvemCancelar" style="flex:1;padding:11px;border:none;border-radius:8px;background:#E0D8CC;font-size:14px;cursor:pointer">Agora não</button>' +
+      '<button id="nuvemEntrar" style="flex:1;padding:11px;border:none;border-radius:8px;background:#1A1714;color:#F5F0E8;font-size:14px;font-weight:600;cursor:pointer">Entrar</button>' +
+      '</div></div>';
+    document.body.appendChild(bg);
+    var em = document.getElementById('nuvemEmail'), se = document.getElementById('nuvemSenha'),
+        er = document.getElementById('nuvemErro'), bt = document.getElementById('nuvemEntrar');
+    setTimeout(function () { em.focus(); }, 50);
+    document.getElementById('nuvemCancelar').onclick = function () { bg.remove(); };
+    function entrar() {
+      er.style.display = 'none';
+      bt.textContent = 'Entrando...'; bt.disabled = true;
+      auth.signInWithEmailAndPassword(em.value.trim(), se.value).then(function () {
+        adminNuvem = true; N.adminNuvem = true;
+        bg.remove();
+        pintarOnline();
+        if (db) conectar();
+        if (aoEntrar) aoEntrar();
+      }).catch(function (e) {
+        bt.textContent = 'Entrar'; bt.disabled = false;
+        var c = String(e && e.code || '');
+        er.textContent = /network/.test(c) ? 'Sem internet. Tente novamente.' :
+          /too-many/.test(c) ? 'Muitas tentativas. Aguarde alguns minutos.' : 'E-mail ou senha incorretos.';
+        er.style.display = 'block';
+      });
+    }
+    bt.onclick = entrar;
+    se.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') entrar(); });
+    return true;
+  };
+
+  N.disponivel = function () { return !!auth && N.online; };
+  N.ehDono = ehDono;
+  N.apagarItemLista = function (nome, id) {
+    if (!db || !podeLista(nome)) return Promise.resolve();
+    delete cache.listas[nome][String(id)];
+    return db.ref(nome + '/' + String(id)).remove().catch(erro);
+  };
+  N.uid = uidAtual;
+  N.temDono = function () { return !!DONO; };
+  N.acesso = function () { return cache.acesso || {}; };
+  N.gravarAcesso = function (caminho, valor) {
+    if (!db || !ehDono()) return Promise.reject('sem permissão');
+    return db.ref('acesso/' + caminho).set(valor).then(function () {
+      // atualiza a copia local na hora (sem esperar o retorno da nuvem)
+      var partes = caminho.split('/'), o = cache.acesso = cache.acesso || {};
+      for (var i = 0; i < partes.length - 1; i++) o = o[partes[i]] = o[partes[i]] || {};
+      if (valor === null) delete o[partes[partes.length - 1]]; else o[partes[partes.length - 1]] = valor;
+      avisar(false);
+    });
+  };
+  N.hash = function (texto) {
+    var dados = new TextEncoder().encode('relatorio:' + (CFG && CFG.projectId) + ':' + texto);
+    return crypto.subtle.digest('SHA-256', dados).then(function (b) {
+      return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    });
+  };
+
+  N.sair = function () {
+    if (auth) auth.signOut().then(function () { location.reload(); });
+  };
+
+  status('Conectando...', '#8B5E3C');
+  try {
+    if (!CFG_OK) {
+      N.pronto = true; N.online = false;
+      status('Sistema não configurado (config.js)', '#C0392B');
+      avisar(true);
+      return;
+    }
+    if (typeof firebase === 'undefined') throw 'SDK não carregou';
+    firebase.initializeApp(CFG);
+    db = firebase.database();
+    auth = firebase.auth ? firebase.auth() : null;
+    if (!auth) {
+      conectar();
+    } else {
+      var primeira = true;
+      auth.onAuthStateChanged(function (u) {
+        if (!primeira) return;
+        primeira = false;
+        if (u && !u.isAnonymous) { adminNuvem = true; N.adminNuvem = true; }
+        if (!u) auth.signInAnonymously().catch(function () {});
+        conectar();
+      });
+    }
+    setTimeout(function () { semNuvem('tempo esgotado'); }, 12000);
+  } catch (e) {
+    semNuvem(e);
+  }
+})();
+</script>
+<!-- ===== FIM NUVEM ===== -->
+</head>
+<body>
+
+<div class="header">
+  <h1>Relatório de Serviço</h1>
+  <p>Envio Mensal — Publicador</p>
+  <div class="month-badge" id="monthBadge"></div>
+  <div id="nuvemStatusSlot" style="margin-top:8px"></div>
+</div>
+
+<div class="container">
+
+  <div class="aviso" id="avisoSemGrupos" style="display:none;margin-bottom:16px"></div>
+
+  <!-- FORM -->
+  <div class="card" id="formCard">
+    <div class="card-title">Enviar Relatório do Mês</div>
+
+    <!-- MES DO RELATORIO -->
+    <div class="form-row">
+      <label>Mês do relatório</label>
+      <div class="pill-group" id="mesGroup"></div>
+      <div id="prazoInfo" style="font-size:11px;color:#999;margin-top:6px"></div>
+    </div>
+
+    <!-- GRUPO -->
+    <div class="form-row">
+      <label>Grupo</label>
+      <select id="grupoSelect" onchange="loadMembros()">
+        <option value="">— Selecione o grupo —</option>
+      </select>
+    </div>
+
+    <!-- NOME -->
+    <div class="form-row">
+      <label>Nome</label>
+      <select id="nomeSelect">
+        <option value="">— Selecione primeiro o grupo —</option>
+      </select>
+    </div>
+
+    <!-- CATEGORIA -->
+    <div class="form-row">
+      <label>Categoria de Serviço</label>
+      <div class="pill-group">
+        <div class="pill" onclick="selectCategoria(this,'Regular')">Pioneiro Regular</div>
+        <div class="pill" onclick="selectCategoria(this,'Auxiliar')">Pioneiro Auxiliar</div>
+        <div class="pill" onclick="selectCategoria(this,'Publicador')">Publicador</div>
+      </div>
+    </div>
+
+    <!-- PARTICIPOU -->
+    <div class="form-row">
+      <label>Participou de atividade este mês?</label>
+      <div class="toggle-group">
+        <div class="toggle-btn" id="btnSim" onclick="setParticipou(true)">✅ Sim</div>
+        <div class="toggle-btn" id="btnNao" onclick="setParticipou(false)">❌ Não</div>
+      </div>
+    </div>
+
+    <!-- CAMPOS CONDICIONAIS -->
+    <div class="numeric-fields" id="numericFields">
+      <div class="horas-row" id="horasRow">
+        <div class="form-row">
+          <label>Horas de Serviço</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="number" id="horasInput" min="0" max="300" placeholder="0" style="max-width:110px">
+            <span style="font-size:13px;color:#999">horas este mês</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Estudos Bíblicos Conduzidos</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="number" id="estudosInput" min="0" max="50" placeholder="0" style="max-width:110px">
+          <span style="font-size:13px;color:#999">estudos este mês</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- OBSERVACOES -->
+    <div class="form-row">
+      <label>Observações <span style="color:#bbb;font-size:10px;text-transform:none">(opcional)</span></label>
+      <textarea id="obsInput" placeholder="Alguma observação para este mês..."></textarea>
+    </div>
+
+    <button class="btn-enviar" onclick="enviar()">Enviar Relatório</button>
+  </div>
+
+  <!-- SUCESSO -->
+  <div class="success-screen card" id="successCard">
+    <div class="icon">🙏</div>
+    <h2 id="successTitulo">Relatório enviado!</h2>
+    <p id="successMsg">Seu relatório foi registrado com sucesso.</p>
+    <div class="success-detail" id="successDetail"></div>
+    <button class="btn-novo" onclick="novoRelatorio()">Enviar outro relatório</button>
+  </div>
+
+  <div class="rodape">Relatório de Serviço de Campo</div>
+
+</div>
+
+<script charset="utf-8">
+const STORAGE_KEY     = 'relatorios_servico';
+const STORAGE_MEMBROS = 'membros_grupos';
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+               "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+var categoriaValue  = null;
+var participouValue = null;
+var MEMBROS  = {};
+var RELATORIOS = [];
+var proximoId = 100;
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  carregarDados();
+  var agora = new Date();
+  montarMeses();
+  var sel = document.getElementById('grupoSelect');
+  if (window.NUVEM) {
+    sel.innerHTML = '<option value="">Carregando grupos...</option>';
+    NUVEM.aoAtualizar(function(primeira) {
+      carregarDados();
+      // Nao mexe na lista se a pessoa ja escolheu o grupo
+      if (primeira || !document.getElementById('grupoSelect').value) popularGrupos();
+    });
+  } else {
+    popularGrupos();
+  }
+});
+
+function carregarDados() {
+  try {
+    var rawM = localStorage.getItem(STORAGE_MEMBROS);
+    MEMBROS = rawM ? JSON.parse(rawM) : {};
+    var todosIds = Object.values(MEMBROS).flat().map(function(m){ return m.id; });
+    proximoId = todosIds.length > 0 ? Math.max.apply(null, todosIds) + 1 : 100;
+    var raw = localStorage.getItem(STORAGE_KEY);
+    RELATORIOS = raw ? JSON.parse(raw).map(function(r){ return Object.assign({}, r, {envio: new Date(r.envio)}); }) : [];
+  } catch(e) { MEMBROS = {}; RELATORIOS = []; }
+}
+
+function salvarDados() {
+  var dados = RELATORIOS.map(function(r){
+    return Object.assign({}, r, {envio: r.envio instanceof Date ? r.envio.toISOString() : r.envio});
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(dados));
+}
+
+// ---- Mes do relatorio (anterior ou atual) ----
+var mesRef = null; // { ano, mes }
+function opcoesMes() {
+  var h = new Date();
+  var ant = new Date(h.getFullYear(), h.getMonth() - 1, 1);
+  return [{ ano: ant.getFullYear(), mes: ant.getMonth() }, { ano: h.getFullYear(), mes: h.getMonth() }];
+}
+function montarMeses() {
+  var ops = opcoesMes(), box = document.getElementById('mesGroup');
+  box.innerHTML = '';
+  // Ate o dia 10 o normal e relatar o mes que passou
+  // Prazo: dia 10 do mes seguinte. Ate o dia 20 o formulario ainda vem no mes anterior,
+  // para que um relatorio atrasado nao caia no mes errado.
+  if (!mesRef) mesRef = new Date().getDate() <= 20 ? ops[0] : ops[1];
+  ops.forEach(function(o) {
+    var p = document.createElement('div');
+    p.className = 'pill' + (o.ano === mesRef.ano && o.mes === mesRef.mes ? ' active' : '');
+    p.textContent = MESES[o.mes] + ' de ' + o.ano;
+    p.onclick = function() { mesRef = o; montarMeses(); loadMembros(); };
+    box.appendChild(p);
+  });
+  document.getElementById('monthBadge').textContent = 'Relatório de ' + MESES[mesRef.mes] + ' de ' + mesRef.ano;
+  var pz = new Date(mesRef.ano, mesRef.mes + 1, 10, 23, 59, 59), info = document.getElementById('prazoInfo');
+  if (info) {
+    var atrasado = new Date() > pz;
+    info.textContent = 'Prazo para enviar: até ' + pz.getDate() + ' de ' + MESES[pz.getMonth()] +
+      (atrasado ? ' (prazo encerrado: envie o quanto antes)' : '');
+    info.style.color = atrasado ? '#C0392B' : '#999';
+  }
+}
+// Data usada para agrupar o relatorio no mes escolhido
+function dataDoMesRef() {
+  var h = new Date();
+  if (mesRef.ano === h.getFullYear() && mesRef.mes === h.getMonth()) return h;
+  return new Date(mesRef.ano, mesRef.mes, 15, 12, 0, 0);
+}
+
+function jaEnviouEsteMes(membroId) {
+  return RELATORIOS.some(function(r) {
+    var d = new Date(r.envio);
+    return parseInt(r.id) === parseInt(membroId) &&
+      d.getMonth() === mesRef.mes && d.getFullYear() === mesRef.ano;
+  });
+}
+
+function popularGrupos() {
+  var sel = document.getElementById('grupoSelect');
+  var grupos = Object.keys(MEMBROS);
+  var aviso = document.getElementById('avisoSemGrupos');
+  if (grupos.length === 0) {
+    var offline = window.NUVEM && !NUVEM.online;
+    aviso.innerHTML = offline
+      ? 'Sem conexão com a internet.<br>Verifique sua conexão e abra o link novamente.'
+      : 'Nenhum grupo cadastrado ainda.<br>Aguarde o administrador configurar os grupos.';
+    aviso.style.display = 'block';
+    document.getElementById('formCard').style.display = 'none';
+    return;
+  }
+  aviso.style.display = 'none';
+  if (document.getElementById('successCard').style.display !== 'block') {
+    document.getElementById('formCard').style.display = 'block';
+  }
+  sel.innerHTML = '<option value="">— Selecione o grupo —</option>';
+  grupos.forEach(function(g) {
+    var o = document.createElement('option');
+    o.value = g; o.textContent = g;
+    sel.appendChild(o);
+  });
+}
+
+function loadMembros() {
+  var grupo = document.getElementById('grupoSelect').value;
+  var sel = document.getElementById('nomeSelect');
+  sel.innerHTML = '';
+  if (!grupo || !MEMBROS[grupo]) {
+    sel.innerHTML = '<option value="">— Selecione primeiro o grupo —</option>';
+    return;
+  }
+  var todos = MEMBROS[grupo];
+  if (todos.length === 0) {
+    sel.innerHTML = '<option value="">— Nenhum publicador neste grupo —</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">— Selecione seu nome —</option>';
+  todos.forEach(function(m) {
+    var o = document.createElement('option');
+    o.value = m.id;
+    var enviou = jaEnviouEsteMes(m.id);
+    o.textContent = enviou ? m.nome + ' (já enviou ' + MESES[mesRef.mes] + ')' : m.nome;
+    sel.appendChild(o);
+  });
+}
+
+function selectCategoria(el, val) {
+  el.parentNode.querySelectorAll('.pill').forEach(function(p){ p.classList.remove('active'); });
+  el.classList.add('active');
+  categoriaValue = val;
+  atualizarCamposExtras();
+}
+
+function setParticipou(val) {
+  participouValue = val;
+  document.getElementById('btnSim').className = 'toggle-btn' + (val ? ' active-yes' : '');
+  document.getElementById('btnNao').className = 'toggle-btn' + (!val ? ' active-no' : '');
+  atualizarCamposExtras();
+}
+
+function atualizarCamposExtras() {
+  var fields = document.getElementById('numericFields');
+  var horasRow = document.getElementById('horasRow');
+  var isPioneiro = categoriaValue === 'Regular' || categoriaValue === 'Auxiliar';
+  var mostrar = participouValue === true;
+  fields.className = 'numeric-fields' + (mostrar ? ' visible' : '');
+  horasRow.style.display = (mostrar && isPioneiro) ? 'block' : 'none';
+  if (!mostrar) {
+    document.getElementById('horasInput').value = '';
+    document.getElementById('estudosInput').value = '';
+  }
+  if (!isPioneiro) document.getElementById('horasInput').value = '';
+}
+
+function enviar() {
+  var grupo = document.getElementById('grupoSelect').value;
+  var nomeId = parseInt(document.getElementById('nomeSelect').value);
+  if (!grupo)       { alert('Selecione o grupo.'); return; }
+  if (!nomeId)      { alert('Selecione seu nome.'); return; }
+  if (!categoriaValue)   { alert('Selecione a categoria.'); return; }
+  if (participouValue === null) { alert('Indique se participou de atividade.'); return; }
+
+  carregarDados(); // pega a versao mais recente vinda da nuvem
+  var membro = MEMBROS[grupo] && MEMBROS[grupo].find(function(m){ return m.id === nomeId; });
+  if (!membro) { alert('Publicador não encontrado.'); return; }
+
+  var isPioneiro = categoriaValue === 'Regular' || categoriaValue === 'Auxiliar';
+  var horas   = (isPioneiro && participouValue) ? parseInt(document.getElementById('horasInput').value)||0 : 0;
+  var estudos = participouValue ? parseInt(document.getElementById('estudosInput').value)||0 : 0;
+  var obs     = document.getElementById('obsInput').value;
+
+  var agora = new Date();
+  var novoRel = {
+    id: nomeId, nome: membro.nome, grupo: grupo,
+    categoria: categoriaValue, participou: participouValue,
+    horas: horas, estudos: estudos, obs: obs,
+    envio: dataDoMesRef(),                 // mes do relatorio
+    enviadoEm: agora.toISOString(),        // quando foi enviado de verdade
+    mesRef: mesRef.ano + '-' + String(mesRef.mes + 1).padStart(2, '0')
+  };
+
+  // Upsert: substitui relatorio do mesmo mes se ja existir
+  var mesAtual = mesRef.mes, anoAtual = mesRef.ano;
+  var idx = -1;
+  for (var i = 0; i < RELATORIOS.length; i++) {
+    var d = new Date(RELATORIOS[i].envio);
+    if (parseInt(RELATORIOS[i].id) === nomeId && d.getMonth() === mesAtual && d.getFullYear() === anoAtual) {
+      idx = i; break;
+    }
+  }
+  var foiAtualizacao = idx >= 0;
+  if (foiAtualizacao) RELATORIOS[idx] = novoRel;
+  else RELATORIOS.push(novoRel);
+  salvarDados();
+
+  // Monta detalhe de sucesso
+  var cats = {Regular:'Pioneiro Regular', Auxiliar:'Pioneiro Auxiliar', Publicador:'Publicador'};
+  var detail = membro.nome + '\n' + cats[categoriaValue] + '\nRelatório de ' + MESES[mesRef.mes] + ' de ' + mesRef.ano;
+  if (participouValue) {
+    if (isPioneiro && horas > 0) detail += '\n' + horas + ' horas';
+    if (estudos > 0) detail += '\n' + estudos + ' estudos bíblicos';
+  } else {
+    detail += '\nNão participou este mês';
+  }
+  if (obs) detail += '\nObs: ' + obs;
+
+  document.getElementById('successTitulo').textContent = foiAtualizacao ? 'Relatório atualizado!' : 'Relatório enviado!';
+  document.getElementById('successMsg').textContent = foiAtualizacao
+    ? 'Seu relatório anterior foi substituído com sucesso.'
+    : 'Seu relatório foi registrado com sucesso.';
+  if (window.NUVEM && !NUVEM.online) {
+    detail += '\n\nATENÇÃO: sem conexão com a internet. O relatório NÃO chegou ao secretário. Tente enviar novamente com internet.';
+  }
+  document.getElementById('successDetail').innerHTML = detail.replace(/\n/g, '<br>');
+  document.getElementById('formCard').style.display = 'none';
+  document.getElementById('successCard').style.display = 'block';
+}
+
+function novoRelatorio() {
+  carregarDados();
+  document.getElementById('formCard').style.display = 'block';
+  document.getElementById('successCard').style.display = 'none';
+  document.getElementById('grupoSelect').value = '';
+  document.getElementById('nomeSelect').innerHTML = '<option value="">— Selecione primeiro o grupo —</option>';
+  document.querySelectorAll('.pill').forEach(function(p){ p.classList.remove('active'); });
+  montarMeses();
+  document.getElementById('btnSim').className = 'toggle-btn';
+  document.getElementById('btnNao').className = 'toggle-btn';
+  document.getElementById('numericFields').className = 'numeric-fields';
+  document.getElementById('horasRow').style.display = 'none';
+  document.getElementById('horasInput').value = '';
+  document.getElementById('estudosInput').value = '';
+  document.getElementById('obsInput').value = '';
+  categoriaValue = null; participouValue = null;
+}
+</script>
+</body>
+</html>
