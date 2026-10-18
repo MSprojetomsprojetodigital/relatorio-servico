@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Importar S-21 e S-88</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #F5F0E8; color: #1A1714; margin: 0; padding: 16px; }
+  .box { max-width: 980px; margin: 0 auto 16px; background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  p.ajuda { font-size: 13px; color: #555; margin: 4px 0 12px; line-height: 1.5; }
+  input[type=email], input[type=password] { padding: 9px; border: 1.5px solid #ccc; border-radius: 8px; width: 100%; box-sizing: border-box; margin-bottom: 8px; font-size: 14px; }
+  button { padding: 10px 18px; border: none; border-radius: 8px; background: #1A1714; color: #F5F0E8; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .ok { color: #2E7D32; } .erro { color: #C0392B; } .aviso { color: #B26A00; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: middle; }
+  th { background: #F5F0E8; }
+  select, .novoGrupo { padding: 5px; font-size: 13px; border: 1px solid #ccc; border-radius: 6px; max-width: 100%; }
+  .tabwrap { overflow-x: auto; }
+  #log { font-family: monospace; font-size: 12px; white-space: pre-wrap; background: #FAFAF7; padding: 10px; border-radius: 8px; max-height: 300px; overflow: auto; }
+  label.op { display: block; font-size: 13px; margin: 6px 0; }
+</style>
+</head>
+<body>
+
+<div class="box">
+  <h1>Importar S-21 e S-88 (ano de serviço 2026)</h1>
+  <p class="ajuda">Esta página grava no Firebase os relatórios mensais e os dados pessoais dos cartões S-21, e a assistência do S-88.
+  Nada é gravado antes de você conferir a lista e apertar <b>Importar</b>. Use a conta do responsável.</p>
+</div>
+
+<div class="box" id="passoLogin">
+  <h2>1. Entrar</h2>
+  <input type="email" id="email" placeholder="E-mail do responsável">
+  <input type="password" id="senha" placeholder="Senha">
+  <button id="btnEntrar">Entrar</button>
+  <span id="msgLogin" style="margin-left:10px;font-size:13px"></span>
+</div>
+
+<div class="box" id="passoArquivo" style="display:none">
+  <h2>2. Escolher o arquivo de dados</h2>
+  <p class="ajuda">Selecione o arquivo <b>dados_s21_s88_2026.json</b> que está no seu computador ou celular.
+  Ele não fica salvo nesta página nem no GitHub.</p>
+  <input type="file" id="arquivo" accept=".json,application/json">
+  <span id="msgArquivo" style="margin-left:10px;font-size:13px"></span>
+</div>
+
+<div class="box" id="passoConferir" style="display:none">
+  <h2>3. Conferir quem é quem</h2>
+  <p class="ajuda">Para cada cartão, o importador procurou o publicador já cadastrado no app pelo nome.
+  Confira a coluna <b>No app</b>. Se não achou, escolha a pessoa certa, ou escolha "Criar novo" e o grupo.</p>
+  <div id="resumoMatch" style="font-size:13px;margin-bottom:10px"></div>
+  <div class="tabwrap"><table id="tabela"></table></div>
+  <div style="margin-top:14px">
+    <label class="op"><input type="checkbox" id="sobrescrever"> Substituir relatórios que já existem no app no mesmo mês (deixe desmarcado para manter os que já estão lá)</label>
+    <label class="op"><input type="checkbox" id="importarS88" checked> Importar também o S-88 (assistência) do ano de serviço 2026</label>
+  </div>
+  <button id="btnImportar" style="margin-top:10px">Importar</button>
+</div>
+
+<div class="box" id="passoLog" style="display:none">
+  <h2>4. Resultado</h2>
+  <div id="log"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  var MESES_LABEL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var db, auth;
+  var MEMBROS = {}, RELS = {}, S21 = {}, S88 = {};
+  var DADOS = null;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function log(t, cls) {
+    var d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = t;
+    $('log').appendChild(d);
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+  try {
+    firebase.initializeApp(window.CONFIG_FIREBASE);
+    db = firebase.database();
+    auth = firebase.auth();
+  } catch (e) {
+    $('msgLogin').innerHTML = '<span class="erro">Não carregou o Firebase. Confira se o config.js está na mesma pasta.</span>';
+  }
+
+  // ---------- 1. Login ----------
+  $('btnEntrar').onclick = function () {
+    $('msgLogin').textContent = 'Entrando...';
+    auth.signInWithEmailAndPassword($('email').value.trim(), $('senha').value).then(function (cred) {
+      if (window.CONFIG_DONO_UID && cred.user.uid !== window.CONFIG_DONO_UID) {
+        $('msgLogin').innerHTML = '<span class="erro">Esta conta não é a do responsável. Só o responsável pode importar.</span>';
+        return;
+      }
+      $('msgLogin').innerHTML = '<span class="ok">Conectado. Carregando dados do app...</span>';
+      return carregarNuvem().then(function () {
+        var n = 0; Object.keys(MEMBROS).forEach(function (g) { n += MEMBROS[g].length; });
+        $('msgLogin').innerHTML = '<span class="ok">Conectado. O app tem ' + Object.keys(MEMBROS).length +
+          ' grupos, ' + n + ' publicadores e ' + Object.keys(RELS).length + ' relatórios.</span>';
+        $('passoArquivo').style.display = 'block';
+      });
+    }).catch(function (e) {
+      $('msgLogin').innerHTML = '<span class="erro">Não foi possível entrar: ' + esc(e && e.message || e) + '</span>';
+    });
+  };
+
+  function carregarNuvem() {
+    return Promise.all([
+      db.ref('membros').once('value'), db.ref('relatorios').once('value'),
+      db.ref('s21').once('value'), db.ref('s88').once('value')
+    ]).then(function (r) {
+      var m = r[0].val(); try { MEMBROS = (typeof m === 'string' ? JSON.parse(m) : m) || {}; } catch (e) { MEMBROS = {}; }
+      RELS = r[1].val() || {};
+      S21 = r[2].val() || {};
+      var s = r[3].val(); try { S88 = (typeof s === 'string' ? JSON.parse(s) : s) || {}; } catch (e) { S88 = {}; }
+    });
+  }
+
+  // ---------- 2. Arquivo ----------
+  $('arquivo').onchange = function (ev) {
+    var f = ev.target.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try { DADOS = JSON.parse(rd.result); } catch (e) { $('msgArquivo').innerHTML = '<span class="erro">Arquivo inválido.</span>'; return; }
+      if (!DADOS.publicadores) { $('msgArquivo').innerHTML = '<span class="erro">Este não é o arquivo de dados do S-21.</span>'; return; }
+      $('msgArquivo').innerHTML = '<span class="ok">' + DADOS.publicadores.length + ' cartões carregados.</span>';
+      montarTabela();
+    };
+    rd.readAsText(f);
+  };
+
+  // ---------- 3. Encontrar publicadores pelo nome ----------
+  function norm(s) {
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z\s]/g, ' ').replace(/\b(de|da|do|dos|das|e)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function todosMembros() {
+    var arr = [];
+    Object.keys(MEMBROS).forEach(function (g) { (MEMBROS[g] || []).forEach(function (m) { arr.push({ g: g, m: m }); }); });
+    return arr;
+  }
+  function acharMembro(nome) {
+    var alvo = norm(nome), ta = alvo.split(' ');
+    var lista = todosMembros(), melhor = null, pontos = 0;
+    lista.forEach(function (x) {
+      var n = norm(x.m.nome), tb = n.split(' ');
+      var p = 0;
+      if (n === alvo) p = 100;
+      else {
+        var comuns = tb.filter(function (t) { return t.length > 1 && ta.indexOf(t) >= 0; }).length;
+        if (ta[0] === tb[0] && comuns >= 2) p = 50 + comuns;
+        else if (comuns >= 2 && comuns === Math.min(ta.length, tb.length)) p = 40 + comuns;
+      }
+      if (p > pontos) { pontos = p; melhor = x; }
+    });
+    return pontos >= 40 ? melhor : null;
+  }
+
+  function opcoesMembro(selecionado) {
+    var h = '<option value="">— Não importar —</option><option value="__novo"' + (selecionado === '__novo' ? ' selected' : '') + '>➕ Criar novo</option>';
+    Object.keys(MEMBROS).forEach(function (g) {
+      h += '<optgroup label="' + esc(g) + '">';
+      (MEMBROS[g] || []).forEach(function (m) {
+        var v = g + '|' + m.id;
+        h += '<option value="' + esc(v) + '"' + (v === selecionado ? ' selected' : '') + '>' + esc(m.nome) + '</option>';
+      });
+      h += '</optgroup>';
+    });
+    return h;
+  }
+  function opcoesGrupo() {
+    var h = '<option value="">— grupo —</option>';
+    Object.keys(MEMBROS).forEach(function (g) { h += '<option value="' + esc(g) + '">' + esc(g) + '</option>'; });
+    return h + '<option value="__outro">Outro (digitar)...</option>';
+  }
+
+  function montarTabela() {
+    var t = $('tabela'), achados = 0;
+    var h = '<tr><th>#</th><th>Cartão S-21</th><th>No app</th><th>Grupo (se for novo)</th><th>Meses</th></tr>';
+    DADOS.publicadores.forEach(function (p, i) {
+      var a = acharMembro(p.nome);
+      var sel = a ? (a.g + '|' + a.m.id) : '__novo';
+      if (a) achados++;
+      var meses = p.meses.filter(mesTemDados).length;
+      h += '<tr><td>' + (i + 1) + '</td><td>' + esc(p.nome) + '</td>' +
+        '<td><select id="m_' + i + '" onchange="window.__trocou(' + i + ')">' + opcoesMembro(sel) + '</select>' +
+        (a ? '' : ' <span class="aviso">não achou</span>') + '</td>' +
+        '<td><span id="gwrap_' + i + '" style="display:' + (a ? 'none' : 'inline') + '"><select id="g_' + i + '" onchange="window.__grupo(' + i + ')">' + opcoesGrupo() + '</select>' +
+        ' <input class="novoGrupo" id="gn_' + i + '" placeholder="Nome do grupo" style="display:none;width:120px"></span></td>' +
+        '<td>' + meses + '</td></tr>';
+    });
+    t.innerHTML = h;
+    $('resumoMatch').innerHTML = '<b>' + achados + '</b> de ' + DADOS.publicadores.length + ' encontrados automaticamente no app.' +
+      (achados < DADOS.publicadores.length ? ' <span class="aviso">Confira os marcados "não achou".</span>' : '');
+    $('passoConferir').style.display = 'block';
+  }
+  window.__trocou = function (i) { $('gwrap_' + i).style.display = $('m_' + i).value === '__novo' ? 'inline' : 'none'; };
+  window.__grupo = function (i) { $('gn_' + i).style.display = $('g_' + i).value === '__outro' ? 'inline' : 'none'; };
+
+  // Mes entra no app se participou, tem observacao, ou vem depois do primeiro mes em que participou
+  function mesTemDados(m, idx, arr) {
+    if (m.participou || (m.observacoes && m.observacoes.trim()) || m.horas) return true;
+    return false;
+  }
+  function mesesParaImportar(p) {
+    var primeiro = -1;
+    p.meses.forEach(function (m, i) { if (primeiro < 0 && (m.participou || m.horas)) primeiro = i; });
+    return p.meses.filter(function (m, i) {
+      if (m.participou || m.horas || (m.observacoes && m.observacoes.trim())) return true;
+      return primeiro >= 0 && i > primeiro; // nao participou, depois de ja ter comecado
+    });
+  }
+
+  function proximoId() {
+    var ids = [99];
+    todosMembros().forEach(function (x) { ids.push(parseInt(x.m.id) || 0); });
+    Object.keys(RELS).forEach(function (k) { ids.push(parseInt(k) || 0); });
+    return Math.max.apply(null, ids) + 1;
+  }
+
+  // ---------- 4. Importar ----------
+  $('btnImportar').onclick = function () {
+    var escolhas = [], faltaGrupo = [];
+    DADOS.publicadores.forEach(function (p, i) {
+      var v = $('m_' + i).value;
+      if (!v) return;
+      if (v === '__novo') {
+        var g = $('g_' + i).value;
+        if (g === '__outro') g = $('gn_' + i).value.trim();
+        if (!g) { faltaGrupo.push(p.nome); return; }
+        escolhas.push({ p: p, novo: true, grupo: g });
+      } else {
+        var partes = v.split('|');
+        escolhas.push({ p: p, novo: false, grupo: partes[0], id: parseInt(partes[1]) });
+      }
+    });
+    if (faltaGrupo.length) { alert('Escolha o grupo para:\n' + faltaGrupo.join('\n')); return; }
+    if (!confirm('Importar ' + escolhas.length + ' publicadores agora?')) return;
+
+    $('btnImportar').disabled = true;
+    $('passoLog').style.display = 'block';
+    $('log').innerHTML = '';
+    var sobrescrever = $('sobrescrever').checked;
+    var agora = new Date().toISOString();
+    var updRel = {}, updS21 = {}, membrosMudou = false;
+    var nRel = 0, nPulados = 0, nNovos = 0;
+
+    escolhas.forEach(function (e) {
+      var p = e.p;
+      // Cadastra novo publicador
+      if (e.novo) {
+        e.id = proximoId();
+        if (!MEMBROS[e.grupo]) MEMBROS[e.grupo] = [];
+        MEMBROS[e.grupo].push({ id: e.id, nome: p.nome, cat: p.pioneiroRegular ? 'Regular' : 'Publicador' });
+        MEMBROS[e.grupo].sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt'); });
+        membrosMudou = true; nNovos++;
+      }
+      var nomeApp = e.novo ? p.nome : ((MEMBROS[e.grupo] || []).find(function (m) { return m.id === e.id; }) || {}).nome || p.nome;
+
+      // Relatorios mensais
+      mesesParaImportar(p).forEach(function (m) {
+        var mes0 = m.mesNum - 1;
+        var dt = new Date(m.ano, mes0, 15, 12, 0, 0);
+        var key = e.id + '_' + m.ano + '_' + m.mesNum;
+        if (RELS[key] && !sobrescrever) { nPulados++; return; }
+        var cat = (p.pioneiroRegular || m.pioneiroRegularNoMes) ? 'Regular' : (m.pioneiroAuxiliar ? 'Auxiliar' : 'Publicador');
+        var obs = m.observacoes || '';
+        if (m.credito) obs = (obs ? obs + ' ' : '') + '(Crédito: ' + m.credito + 'h)';
+        var rel = {
+          id: e.id, nome: nomeApp, grupo: e.grupo, categoria: cat,
+          participou: !!m.participou, horas: m.horas || 0, estudos: m.estudos || 0, obs: obs,
+          envio: dt.toISOString(), enviadoEm: agora,
+          mesRef: m.ano + '-' + String(m.mesNum).padStart(2, '0'), importado: 'S-21 2026'
+        };
+        updRel[key] = JSON.stringify(rel); nRel++;
+      });
+
+      // Dados pessoais do S-21 (so preenche o que estiver vazio no app)
+      var k21 = 'pub_' + e.id, atual = {};
+      try { atual = S21[k21] ? JSON.parse(S21[k21]) : {}; } catch (er) { atual = {}; }
+      var novo = {
+        nome: p.nome, nascimento: p.nascimento, batismo: p.batismo, sexo: p.sexo || undefined,
+        anciao: p.anciao, servo: p.servo, pionReg: p.pioneiroRegular, pionEsp: p.pioneiroEspecial,
+        miss: p.missionario, outrasOvelhas: p.outrasOvelhas, ungido: p.ungido
+      };
+      Object.keys(novo).forEach(function (c) {
+        var vazio = atual[c] === undefined || atual[c] === '' || atual[c] === null;
+        if (novo[c] !== undefined && (vazio || sobrescrever)) atual[c] = novo[c];
+      });
+      updS21[k21] = JSON.stringify(atual);
+    });
+
+    var tarefas = [];
+    if (membrosMudou) tarefas.push(db.ref('membros').set(JSON.stringify(MEMBROS)).then(function () { log('✓ ' + nNovos + ' publicadores novos cadastrados nos grupos.', 'ok'); }));
+    tarefas.push(db.ref('relatorios').update(updRel).then(function () {
+      log('✓ ' + nRel + ' relatórios mensais gravados.', 'ok');
+      if (nPulados) log('• ' + nPulados + ' meses já existiam no app e foram mantidos como estavam.', 'aviso');
+    }));
+    tarefas.push(db.ref('s21').update(updS21).then(function () { log('✓ Dados pessoais do S-21 de ' + Object.keys(updS21).length + ' publicadores gravados.', 'ok'); }));
+
+    if ($('importarS88').checked && DADOS.s88) {
+      var nS88 = 0;
+      DADOS.s88.forEach(function (x) {
+        if (x.anoServico !== 2026) return; // o ano atual continua vindo do S-3 do app
+        var chave = 'ano_' + x.anoServico, label = MESES_LABEL[x.mesNum - 1];
+        if (!S88[chave]) S88[chave] = {};
+        if (S88[chave][label] && !sobrescrever) return;
+        S88[chave][label] = {
+          semana: { qtd: x.meioSemana.reunioes, total: x.meioSemana.total, media: x.meioSemana.total / x.meioSemana.reunioes },
+          fds: { qtd: x.fimSemana.reunioes, total: x.fimSemana.total, media: x.fimSemana.total / x.fimSemana.reunioes }
+        };
+        nS88++;
+      });
+      tarefas.push(db.ref('s88').set(JSON.stringify(S88)).then(function () { log('✓ S-88: ' + nS88 + ' meses do ano de serviço 2026 gravados.', 'ok'); }));
+    }
+
+    Promise.all(tarefas).then(function () {
+      log('');
+      log('Pronto! Abra o app, entre no Admin e confira os cartões S-21 (use a seta para voltar ao Ano de Serviço 2026).', 'ok');
+    }).catch(function (er) {
+      log('Erro ao gravar: ' + (er && er.message || er), 'erro');
+      log('Nada foi apagado. Confira a internet e tente de novo.', 'erro');
+      $('btnImportar').disabled = false;
+    });
+  };
+})();
+</script>
+</body>
+</html>
