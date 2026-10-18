@@ -3917,12 +3917,12 @@ function linkDoForm(tipo) { return tipo === 'Pub' ? gerarLinkPublicador() : gera
 function preencherLinksForms() {
   ['Pub', 'Ind'].forEach(function(t) {
     var el = document.getElementById('linkForm' + t);
-    if (el) el.value = linkDoForm(t) || 'Disponível quando o site estiver publicado no Netlify';
+    if (el) el.value = linkDoForm(t) || 'Disponível quando o site estiver publicado (GitHub Pages ou Netlify)';
   });
 }
 function copiarLinkForm(tipo) {
   var link = linkDoForm(tipo);
-  if (!link) { alert('O link fica disponível quando o site estiver publicado no Netlify.'); return; }
+  if (!link) { alert('O link fica disponível quando o site estiver publicado (GitHub Pages ou Netlify).'); return; }
   function ok() { mostrarBannerS3('Link copiado! Cole no WhatsApp ou onde quiser.'); }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(link).then(ok, function(){ copiarAntigo(link); ok(); });
@@ -3934,7 +3934,7 @@ function copiarAntigo(texto) {
 }
 function abrirLinkForm(tipo) {
   var link = linkDoForm(tipo);
-  if (!link) { alert('O link fica disponível quando o site estiver publicado no Netlify.'); return; }
+  if (!link) { alert('O link fica disponível quando o site estiver publicado (GitHub Pages ou Netlify).'); return; }
   abrirLink(link);
 }
 
@@ -5303,7 +5303,9 @@ function renderS21ResumoCat(cat, anoInicioParam) {
 
   // Seletor de 5 anos
   var anoAtualInicio = (new Date().getMonth() >= 8) ? new Date().getFullYear() : new Date().getFullYear() - 1;
-  var anoInicio = anoInicioParam !== undefined ? anoInicioParam : anoAtualInicio;
+  // Primeira aba = ano de servico anterior (consulta); as setas andam 5 anos
+  var baseAnos = anoAtualInicio - 1 + s21AnoOffset;
+  var anoInicio = anoInicioParam !== undefined ? anoInicioParam : (s21AnoOffset === 0 ? anoAtualInicio : baseAnos);
 
   // Tabs de anos com navegacao
   var anoTabsDiv = document.createElement('div');
@@ -5313,7 +5315,7 @@ function renderS21ResumoCat(cat, anoInicioParam) {
   var btnPrevCat = document.createElement('button');
   btnPrevCat.textContent = '◀';
   btnPrevCat.style.cssText = 'padding:8px 12px;border:2px solid var(--border);border-radius:8px;background:white;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer';
-  btnPrevCat.onclick = function() { s21AnoOffset -= 5; renderS21ResumoCat(cat); };
+  btnPrevCat.onclick = function() { s21AnoOffset -= 5; renderS21ResumoCat(cat, anoAtualInicio - 1 + s21AnoOffset + 4); };
   anoTabsDiv.appendChild(btnPrevCat);
 
   for (var i = 0; i < 5; i++) {
@@ -5327,14 +5329,14 @@ function renderS21ResumoCat(cat, anoInicioParam) {
         ';font-size:13px;font-weight:500;cursor:pointer;font-family:"DM Sans",sans-serif';
       btn.onclick = function() { renderS21ResumoCat(cat, a); };
       anoTabsDiv.appendChild(btn);
-    })(anoAtualInicio + i);
+    })(baseAnos + i);
   }
 
   // Botao proximo
   var btnNextCat = document.createElement('button');
   btnNextCat.textContent = '▶';
   btnNextCat.style.cssText = 'padding:8px 12px;border:2px solid var(--border);border-radius:8px;background:white;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer';
-  btnNextCat.onclick = function() { s21AnoOffset += 5; renderS21ResumoCat(cat); };
+  btnNextCat.onclick = function() { s21AnoOffset += 5; renderS21ResumoCat(cat, anoAtualInicio - 1 + s21AnoOffset); };
   anoTabsDiv.appendChild(btnNextCat);
 
   container.appendChild(anoTabsDiv);
