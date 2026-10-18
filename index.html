@@ -5918,8 +5918,7 @@ function sincronizarS88(){
   if(!s88[key]) s88[key]={};
   meses.forEach(function(m){
     var calc = calcMesS3Int(m.mes,m.ano);
-    if(calc) s88[key][m.label]=calc;
-    else delete s88[key][m.label];
+    if(calc) s88[key][m.label]=calc; // meses sem S-3 (ex.: importados) ficam como estao
   });
   setS88Int(s88);
   mostrarBannerS3('S-88 sincronizado com S-3!');
@@ -5934,13 +5933,14 @@ function inicializarS88(){
   var anoAtual = getAnoInicioAtualInt();
   var sel = document.getElementById('s88AnoSelect');
   sel.innerHTML = '';
-  for(var i=0;i<5;i++){
+  for(var i=-1;i<5;i++){ // -1 = ano de servico anterior (consulta)
     var a = anoAtual+i;
     var o = document.createElement('option');
     o.value = a;
     o.textContent = 'Ano de Serviço '+(a+1);
     sel.appendChild(o);
   }
+  sel.value = anoAtual;
   sincronizarS88();
 }
 
