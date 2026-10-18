@@ -5398,7 +5398,7 @@ function renderS21ResumoCat(cat, anoInicioParam) {
   titulo.innerHTML =
     '<div style="font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink)">REGISTRO DE PUBLICADOR DE CONGREGAÇÃO</div>' +
     '<div style="font-size:13px;color:' + c.cor + ';font-weight:600;margin-top:4px">' + c.label.toUpperCase() + '</div>' +
-    '<div style="font-size:11px;color:#888;margin-top:2px">Mês de referência: ' + mesAtual + '</div>';
+    '<div style="font-size:11px;color:#888;margin-top:2px">' + getAnoServicoLabel(anoInicio) + ' (Set/' + anoInicio + ' - Ago/' + (anoInicio + 1) + ')</div>';
   card.appendChild(titulo);
 
   // Cards de totais
@@ -5415,20 +5415,19 @@ function renderS21ResumoCat(cat, anoInicioParam) {
 
   var totaisHTML = '';
   if (c.mostrarHoras) {
-    totaisHTML += statCard(totalHoras, 'Total de Horas', 'horas no mês', c.cor);
+    totaisHTML += statCard(totalHoras, 'Total de Horas', 'horas no ano', c.cor);
   }
-  totaisHTML += statCard(totalEstudos, 'Estudos Bíblicos', 'estudos no mês', c.cor);
-  totaisHTML += statCard(qtdEnviaram, 'Entregaram', 'de ' + totalMembros + ' cadastrados', c.cor);
+  totaisHTML += statCard(totalEstudos, 'Estudos Bíblicos', 'soma dos meses', c.cor);
+  totaisHTML += statCard(qtdEnviaram, 'Relatórios', 'entregues no ano', c.cor);
   totaisGrid.innerHTML = totaisHTML;
   card.appendChild(totaisGrid);
 
-  // Tabela S-21 com 12 meses do ano de servico
-  var anoInicio = agora.getMonth() >= 8 ? agora.getFullYear() : agora.getFullYear() - 1;
+  // Tabela S-21 com 12 meses do ano de servico escolhido nas abas
   var mesesAno = getAnosServico(anoInicio);
 
   var tabelaLabel = document.createElement('div');
   tabelaLabel.style.cssText = 'font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--warm);margin-bottom:8px;font-weight:600';
-  tabelaLabel.textContent = 'Registro Mensal — Ano de Serviço ' + getAnoServicoLabel(anoInicio);
+  tabelaLabel.textContent = 'Registro Mensal — ' + getAnoServicoLabel(anoInicio);
   card.appendChild(tabelaLabel);
 
   var table = document.createElement('table');
@@ -5507,9 +5506,9 @@ function renderS21ResumoCat(cat, anoInicioParam) {
   var btnPrint = document.createElement('button');
   btnPrint.className = 's21-btn s21-btn-print';
   btnPrint.textContent = '🖨️ Imprimir / PDF';
-  btnPrint.onclick = (function(ch, cc, co, th, te, qe, tm){ return function(){
-    imprimirResumoCategoria(ch, cc, co, th, te, qe, tm);
-  }; })(cat, c, obs, totalHoras, totalEstudos, qtdEnviaram, totalMembros);
+  btnPrint.onclick = (function(ch, cc, co, th, te, qe, tm, ai){ return function(){
+    imprimirResumoCategoria(ch, cc, co, th, te, qe, tm, ai);
+  }; })(cat, c, obs, totalHoras, totalEstudos, qtdEnviaram, totalMembros, anoInicio);
 
   var btnWA = document.createElement('button');
   btnWA.className = 's21-btn';
@@ -5561,7 +5560,7 @@ function renderS21ResumoCat(cat, anoInicioParam) {
   container.appendChild(card);
 }
 
-function imprimirResumoCategoria(cat, c, obs, totalHoras, totalEstudos, qtdEnviaram, totalMembros) {
+function imprimirResumoCategoria(cat, c, obs, totalHoras, totalEstudos, qtdEnviaram, totalMembros, anoSel) {
   var agora = new Date();
   var months = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   var mesAtual = months[agora.getMonth()] + ' de ' + agora.getFullYear();
@@ -5588,15 +5587,15 @@ function imprimirResumoCategoria(cat, c, obs, totalHoras, totalEstudos, qtdEnvia
     '</style></head><body>');
   win.document.write('<h2>REGISTRO DE PUBLICADOR DE CONGREGAÇÃO</h2>');
   win.document.write('<h3>' + c.label.toUpperCase() + '</h3>');
-  win.document.write('<h4>Mês de referência: ' + mesAtual + '</h4>');
+  var anoInicio = (anoSel !== undefined) ? anoSel : (agora.getMonth() >= 8 ? agora.getFullYear() : agora.getFullYear() - 1);
+  win.document.write('<h4>' + getAnoServicoLabel(anoInicio) + ' (Set/' + anoInicio + ' - Ago/' + (anoInicio + 1) + ')</h4>');
   win.document.write('<div class="totais">');
   if (c.mostrarHoras) win.document.write('<div class="tot-card"><div class="tot-val">' + totalHoras + '</div><div class="tot-lbl">Total de Horas</div></div>');
   win.document.write('<div class="tot-card"><div class="tot-val">' + totalEstudos + '</div><div class="tot-lbl">Estudos Bíblicos</div></div>');
-  win.document.write('<div class="tot-card"><div class="tot-val">' + qtdEnviaram + '</div><div class="tot-lbl">Entregaram /' + totalMembros + '</div></div>');
+  win.document.write('<div class="tot-card"><div class="tot-val">' + qtdEnviaram + '</div><div class="tot-lbl">Relatórios no ano</div></div>');
   win.document.write('</div>');
 
-  // Tabela anual
-  var anoInicio = agora.getMonth() >= 8 ? agora.getFullYear() : agora.getFullYear() - 1;
+  // Tabela anual (ano escolhido)
   var mesesAno = getAnosServico(anoInicio);
   win.document.write('<table><thead><tr><th>Mês</th><th>Entregaram</th><th>Participaram</th>');
   if (c.mostrarHoras) win.document.write('<th>Horas</th>');
