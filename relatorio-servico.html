@@ -2785,10 +2785,31 @@ function getMesesDisponiveis() {
 }
 
 function getRelatoriosDoMes(ano, mes) {
+  var CH = mapaChegadas();
   return RELATORIOS.filter(r => {
     const d = new Date(r.envio);
-    return d.getFullYear() === ano && d.getMonth() === mes;
+    return d.getFullYear() === ano && d.getMonth() === mes && contaNaCongregacao(r, CH);
   });
+}
+
+// Publicador que veio de outra congregacao: os relatorios anteriores ao mes de chegada
+// continuam no S-21 dele (consulta), mas nao entram nos totais da congregacao.
+// A data fica no S-21 > "Chegou à congregação em" (MM/AAAA).
+function mapaChegadas() {
+  var mapa = {}, dados = {};
+  try { dados = JSON.parse(localStorage.getItem('s21_dados') || '{}') || {}; } catch (e) { dados = {}; }
+  Object.keys(dados).forEach(function(k) {
+    var ch = dados[k] && dados[k].chegada ? String(dados[k].chegada).trim() : '';
+    var m = /^(\d{1,2})\s*\/\s*(\d{4})$/.exec(ch);
+    if (m) mapa[k.replace('pub_', '')] = parseInt(m[2]) * 12 + parseInt(m[1]) - 1;
+  });
+  return mapa;
+}
+function contaNaCongregacao(r, CH) {
+  var lim = (CH || mapaChegadas())[String(parseInt(r.id))];
+  if (lim === undefined) return true;
+  var d = new Date(r.envio);
+  return d.getFullYear() * 12 + d.getMonth() >= lim;
 }
 
 // ============= INIT =============
@@ -4233,13 +4254,6 @@ function abrirS21() {
   var grupo = document.getElementById('s21GrupoSelect').value;
   var membroId = parseInt(document.getElementById('s21PublicadorSelect').value);
   if (!membroId || !grupo) return;
-  // Debug: log relatorios encontrados para este membro
-  var mesesDebug = getAnosServico();
-  console.log('Abrindo S21 para membroId:', membroId, 'grupo:', grupo);
-  console.log('Total RELATÓRIOS:', RELATORIOS.length);
-  RELATORIOS.forEach(function(r) {
-    console.log('  relatorio:', r.id, typeof r.id, r.nome, new Date(r.envio).toLocaleDateString(), 'participou:', r.participou, 'estudos:', r.estudos, 'horas:', r.horas);
-  });
   var membro = (grupo === '__inativos' ? lerLista('inativos') : (MEMBROS[grupo] || [])).find(function(m){ return parseInt(m.id) === membroId; });
   if (!membro) return;
 
@@ -4494,6 +4508,10 @@ function abrirS21() {
   grid.appendChild(campo('Nome', 'nome', info.nome));
   grid.appendChild(campo('Data de Nascimento', 'nascimento', info.nascimento));
   grid.appendChild(campo('Data de Batismo', 'batismo', info.batismo));
+  var campoCh = campo('Chegou à congregação em (MM/AAAA)', 'chegada', info.chegada);
+  campoCh.querySelector('input').placeholder = 'Ex.: 10/2026 (deixe vazio se sempre foi daqui)';
+  campoCh.title = 'Relatórios anteriores a este mês ficam no S-21 para consulta, mas não entram nos totais da congregação.';
+  grid.appendChild(campoCh);
 
   // Sexo
   var sexoDiv = document.createElement('div');
@@ -4636,7 +4654,7 @@ function autoSalvarDadosPessoaisS21(membroId) {
   var dados = carregarS21Dados();
   var key = getS21Key(membroId);
   var infoAtual = dados[key] || {};
-  var campos = ['nome','nascimento','batismo'];
+  var campos = ['nome','nascimento','batismo','chegada'];
   campos.forEach(function(c) {
     var el = document.getElementById('s21_' + c);
     if (el) infoAtual[c] = el.value;
@@ -5343,9 +5361,10 @@ function renderS21ResumoCat(cat, anoInicioParam) {
 
   // Usa todos os relatorios do ano de servico selecionado
   var mesesAnoSel = getAnosServico(anoInicio);
+  var CH = mapaChegadas();
   var relAno = RELATORIOS.filter(function(r) {
     var d = new Date(r.envio);
-    return mesesAnoSel.some(function(m){ return d.getMonth()===m.mes && d.getFullYear()===m.ano; });
+    return contaNaCongregacao(r, CH) && mesesAnoSel.some(function(m){ return d.getMonth()===m.mes && d.getFullYear()===m.ano; });
   });
   var rel = relAno;
 
@@ -5449,7 +5468,7 @@ function renderS21ResumoCat(cat, anoInicioParam) {
     // Relatorios desta categoria neste mes
     var relMes = RELATORIOS.filter(function(r) {
       var d = new Date(r.envio);
-      return r.categoria === c.cat && d.getMonth() === m.mes && d.getFullYear() === m.ano;
+      return r.categoria === c.cat && d.getMonth() === m.mes && d.getFullYear() === m.ano && contaNaCongregacao(r, CH);
     });
     var partMes = relMes.filter(function(r){ return r.participou === true; });
     var hMes = partMes.reduce(function(s,r){ return s+(parseInt(r.horas)||0); }, 0);
@@ -5601,11 +5620,11 @@ function imprimirResumoCategoria(cat, c, obs, totalHoras, totalEstudos, qtdEnvia
   if (c.mostrarHoras) win.document.write('<th>Horas</th>');
   win.document.write('<th>Estudos</th><th>Observações</th></tr></thead><tbody>');
 
-  var totH=0, totE=0, totEntr=0;
+  var totH=0, totE=0, totEntr=0, CHp = mapaChegadas();
   mesesAno.forEach(function(m) {
     var relMes = RELATORIOS.filter(function(r) {
       var d = new Date(r.envio);
-      return r.categoria === c.cat && d.getMonth()===m.mes && d.getFullYear()===m.ano;
+      return r.categoria === c.cat && d.getMonth()===m.mes && d.getFullYear()===m.ano && contaNaCongregacao(r, CHp);
     });
     var partMes = relMes.filter(function(r){ return r.participou===true; });
     var hMes = partMes.reduce(function(s,r){ return s+(parseInt(r.horas)||0); }, 0);
