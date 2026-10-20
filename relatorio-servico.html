@@ -4195,9 +4195,20 @@ var s21AnoOffset = 0;
 
 // S-21 mostra 3 anos de servico: o atual (verde), o anterior (azul, ja enviado)
 // e o retrasado (vermelho, pode ser apagado com as duas chaves).
-function getUltimosAnosServico(n) {
+function getUltimosAnosServico(n, temDados) {
   var a = getAnoInicioAtual();
-  return [a - 2, a - 1, a];
+  var anos = [a - 2, a - 1, a];
+  // O ano vermelho so aparece enquanto ainda tiver relatorios; depois de apagado, some
+  if (typeof temDados === 'function' && !temDados(a - 2)) anos.shift();
+  return anos;
+}
+function temRelatoriosNoAno(anoInicio, filtro) {
+  var meses = getAnosServico(anoInicio);
+  return RELATORIOS.some(function(r) {
+    if (filtro && !filtro(r)) return false;
+    var d = new Date(r.envio);
+    return meses.some(function(m){ return d.getMonth() === m.mes && d.getFullYear() === m.ano; });
+  });
 }
 function corAnoS21(anoInicio) {
   var a = getAnoInicioAtual();
@@ -4279,7 +4290,7 @@ function abrirS21() {
   });
 
   // Seletor de ano de servico (5 anos)
-  var anos = getUltimosAnosServico(5);
+  var anos = getUltimosAnosServico(5, function(a){ return temRelatoriosNoAno(a, function(r){ return parseInt(r.id) === membroId; }); });
   var anoSelecionado = anos[anos.length - 1]; // começa pelo ano atual
 
   // Tabs de ano
@@ -4694,7 +4705,7 @@ function apagarAnoCategoriaS21(cat, c, anoInicio) {
     RELATORIOS = RELATORIOS.filter(function(r){ return !noAno(r); });
     salvarDados(); // grava no aparelho e apaga na nuvem
     mostrarBannerS3(anoLabel + ' de ' + c.label + ' apagado.');
-    renderS21ResumoCat(cat, anoInicio);
+    renderS21ResumoCat(cat); // volta ao ano atual; o ano apagado some das abas
   });
 }
 
@@ -5334,7 +5345,8 @@ function renderS21ResumoCat(cat, anoInicioParam) {
   var anoTabsDiv = document.createElement('div');
   anoTabsDiv.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;align-items:center';
 
-  getUltimosAnosServico().forEach(function(a) {
+  var catNome = { reg: 'Regular', aux: 'Auxiliar', pub: 'Publicador' }[cat];
+  getUltimosAnosServico(3, function(a){ return temRelatoriosNoAno(a, function(r){ return r.categoria === catNome; }); }).forEach(function(a) {
     var cor = corAnoS21(a), ativo = (a === anoInicio);
     var btn = document.createElement('button');
     btn.textContent = getAnoServicoLabel(a);
