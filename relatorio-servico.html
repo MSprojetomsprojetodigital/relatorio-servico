@@ -1183,7 +1183,7 @@
 <div class="pin-overlay" id="pinOverlay">
   <div class="pin-box">
     <div style="font-size:32px;margin-bottom:8px">🔐</div>
-    <h2>Acesso Admin</h2>
+    <h2>Acesso dos Anciãos</h2>
     <p>Digite o PIN para acessar o painel</p>
     <input class="pin-input" type="password" id="pinInput" maxlength="5" placeholder="•••••" oninput="checkPin()">
     <button class="pin-btn" onclick="checkPin()">Entrar</button>
@@ -1219,7 +1219,7 @@
 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
 <div class="mode-toggle">
   <button class="mode-btn active" onclick="switchMode('user')">Publicador</button>
-  <button class="mode-btn" onclick="switchMode('admin')">Admin</button>
+  <button class="mode-btn" onclick="switchMode('admin')">Anciãos</button>
 </div>
 <button id="btnTrocarPinTopo" onclick="trocarPin()" style="display:none;margin-top:20px;padding:8px 14px;background:var(--warm);color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer">🔑 Trocar PIN</button>
 <button id="btnLoginNuvem" onclick="if(window.NUVEM){ NUVEM.adminNuvem ? (confirm('Sair da conta de administrador neste aparelho?') && NUVEM.sair()) : NUVEM.pedirLogin(atualizarBotoesAdmin); }" style="display:none;margin-top:20px;padding:8px 14px;background:#888;color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer"></button>
@@ -1328,7 +1328,6 @@
     <button class="admin-tab" onclick="switchAdminTab('s3')">🏛️ S-3</button>
     <button class="admin-tab" onclick="switchAdminTab('s88')">📊 S-88</button>
     <button class="admin-tab" onclick="switchAdminTab('listas')">📁 Listas</button>
-    <button class="admin-tab" onclick="switchAdminTab('s61')">📄 S-61</button>
   </div>
 
   <!-- TAB: RESUMO -->
@@ -1528,7 +1527,7 @@
 
       <div style="background:#EAF2EE;border:1px solid var(--sage);border-radius:10px;padding:12px 14px;margin-bottom:10px">
         <div style="font-size:12px;font-weight:600;color:var(--sage);margin-bottom:6px">📋 Formulário dos Publicadores</div>
-        <div style="font-size:12px;color:#555;margin-bottom:8px">Envie este link aos publicadores. Eles abrem no celular e enviam o relatório. Não é o link do Admin.</div>
+        <div style="font-size:12px;color:#555;margin-bottom:8px">Envie este link aos publicadores. Eles abrem no celular e enviam o relatório. Não é o link da área dos Anciãos.</div>
         <input id="linkFormPub" readonly onclick="this.select()" style="width:100%;box-sizing:border-box;padding:8px 10px;font-size:12px;border:1.5px solid var(--sage);border-radius:7px;background:white;color:#333;margin-bottom:8px">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button onclick="compartilharFormWA('pub')" style="padding:8px 14px;background:#25D366;color:white;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer">📱 Enviar no WhatsApp</button>
@@ -4194,13 +4193,17 @@ function getAnoServicoLabel(anoInicio) {
 // Offset de anos para navegacao alem dos 5 anos padrao
 var s21AnoOffset = 0;
 
+// S-21 mostra 3 anos de servico: o atual (verde), o anterior (azul, ja enviado)
+// e o retrasado (vermelho, pode ser apagado com as duas chaves).
 function getUltimosAnosServico(n) {
-  var anoAtual = getAnoInicioAtual() + s21AnoOffset;
-  var anos = [];
-  for (var i = 0; i < n; i++) {
-    anos.push(anoAtual + i);
-  }
-  return anos;
+  var a = getAnoInicioAtual();
+  return [a - 2, a - 1, a];
+}
+function corAnoS21(anoInicio) {
+  var a = getAnoInicioAtual();
+  if (anoInicio >= a) return '#2E7D32';      // atual: verde
+  if (anoInicio === a - 1) return '#1565C0'; // anterior: azul
+  return '#C0392B';                          // mais antigo: vermelho
 }
 
 // Busca relatorio do publicador em determinado mes/ano
@@ -4277,7 +4280,7 @@ function abrirS21() {
 
   // Seletor de ano de servico (5 anos)
   var anos = getUltimosAnosServico(5);
-  var anoSelecionado = anos[0]; // começa pelo mais recente
+  var anoSelecionado = anos[anos.length - 1]; // começa pelo ano atual
 
   // Tabs de ano
   var anoTabsWrap = document.createElement('div');
@@ -4287,10 +4290,13 @@ function abrirS21() {
     anoSelecionado = anoInicio;
     // Atualiza estilo das tabs
     anoTabsWrap.querySelectorAll('button').forEach(function(b) {
+      if (!b.dataset.ano) return;
       var isAtivo = parseInt(b.dataset.ano) === anoInicio;
-      b.style.background = isAtivo ? 'var(--ink)' : 'white';
-      b.style.color = isAtivo ? 'var(--cream)' : 'var(--ink)';
-      b.style.borderColor = isAtivo ? 'var(--ink)' : 'var(--border)';
+      var cor = corAnoS21(parseInt(b.dataset.ano));
+      b.style.background = isAtivo ? cor : 'white';
+      b.style.color = isAtivo ? 'white' : cor;
+      b.style.borderColor = cor;
+      b.style.fontWeight = isAtivo ? '700' : '600';
     });
     // Renderiza a tabela do ano selecionado
     var tabelaContainer = document.getElementById('s21TabelaContainer');
@@ -4431,8 +4437,8 @@ function abrirS21() {
     btnBar2.appendChild(btnPrint2);
     btnBar2.appendChild(btnWA2);
     btnBar2.appendChild(btnGm2);
-    // Apagar: so anos de servico ja encerrados (nunca o atual)
-    if (anoInicio < getAnoInicioAtual()) {
+    // Apagar: so o ano em vermelho (o atual e o anterior ficam protegidos)
+    if (anoInicio < getAnoInicioAtual() - 1) {
       var btnDel2 = document.createElement('button');
       btnDel2.textContent = '🗑️ Apagar ' + anoLabel;
       btnDel2.style.cssText = estBtn + 'background:white;color:var(--red);border:1.5px solid var(--red)';
@@ -4444,17 +4450,6 @@ function abrirS21() {
     tabelaContainer.appendChild(btnBar2);
   }
 
-  // Botao: anos anteriores
-  var btnPrev = document.createElement('button');
-  btnPrev.textContent = '◀';
-  btnPrev.title = 'Anos anteriores';
-  btnPrev.style.cssText = 'padding:8px 12px;border:2px solid var(--border);border-radius:8px;background:white;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;font-family:"DM Sans",sans-serif';
-  btnPrev.onclick = function() {
-    s21AnoOffset -= 5;
-    abrirS21();
-  };
-  anoTabsWrap.appendChild(btnPrev);
-
   // Cria botoes de anos
   anos.forEach(function(ano) {
     var btn = document.createElement('button');
@@ -4465,16 +4460,6 @@ function abrirS21() {
     anoTabsWrap.appendChild(btn);
   });
 
-  // Botao: proximos anos
-  var btnNext = document.createElement('button');
-  btnNext.textContent = '▶';
-  btnNext.title = 'Próximos anos';
-  btnNext.style.cssText = 'padding:8px 12px;border:2px solid var(--border);border-radius:8px;background:white;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;font-family:"DM Sans",sans-serif';
-  btnNext.onclick = function() {
-    s21AnoOffset += 5;
-    abrirS21();
-  };
-  anoTabsWrap.appendChild(btnNext);
 
   var card = document.createElement('div');
   card.className = 's21-card';
@@ -4572,8 +4557,8 @@ function abrirS21() {
   s21CartaoAberto = membroId;
   card.addEventListener('input', s21AgendarSalvar);
   card.addEventListener('change', s21AgendarSalvar);
-  // Abre automaticamente o ano mais recente
-  renderTabelaAno(anos[0]);
+  // Abre automaticamente o ano atual
+  renderTabelaAno(anos[anos.length - 1]);
 }
 
 function imprimirS21Ano(nome, info, anoInicio, meses, relPorMes) {
@@ -4693,6 +4678,26 @@ function textoS21Ano(nome, anoInicio, meses, relPorMes) {
   return L.join('\n');
 }
 
+// Apaga um ano de servico inteiro de uma categoria (Regulares, Auxiliares ou Publicadores).
+// Os dados pessoais do S-21 (nascimento, batismo etc.) e os outros anos continuam.
+function apagarAnoCategoriaS21(cat, c, anoInicio) {
+  var meses = getAnosServico(anoInicio);
+  var anoLabel = getAnoServicoLabel(anoInicio);
+  var noAno = function(r) {
+    if (r.categoria !== c.cat) return false;
+    var d = new Date(r.envio);
+    return meses.some(function(m){ return d.getMonth() === m.mes && d.getFullYear() === m.ano; });
+  };
+  var qtd = RELATORIOS.filter(noAno).length;
+  if (qtd === 0) { alert('Não há relatórios de ' + c.label + ' no ' + anoLabel + '. Nada para apagar.'); return; }
+  exigirChave('apagar ' + qtd + ' relatório' + (qtd > 1 ? 's' : '') + ' de ' + c.label + ' do ' + anoLabel + ' (os dados pessoais do S-21 e os outros anos continuam)', function() {
+    RELATORIOS = RELATORIOS.filter(function(r){ return !noAno(r); });
+    salvarDados(); // grava no aparelho e apaga na nuvem
+    mostrarBannerS3(anoLabel + ' de ' + c.label + ' apagado.');
+    renderS21ResumoCat(cat, anoInicio);
+  });
+}
+
 function apagarAnoS21(membroId, nome, anoInicio, meses) {
   var noAno = function(r) {
     if (parseInt(r.id) !== parseInt(membroId)) return false;
@@ -4713,7 +4718,8 @@ function apagarAnoS21(membroId, nome, anoInicio, meses) {
 function salvarCartaoS21(membroId, grupo, meses) {
   var dados = carregarS21Dados();
   var key = getS21Key(membroId);
-  var info = {
+  var info = Object.assign({}, dados[key] || {}, {
+    chegada: document.getElementById('s21_chegada') ? document.getElementById('s21_chegada').value : ((dados[key] || {}).chegada || ''),
     nome: document.getElementById('s21_nome') ? document.getElementById('s21_nome').value : '',
     nascimento: document.getElementById('s21_nascimento') ? document.getElementById('s21_nascimento').value : '',
     batismo: document.getElementById('s21_batismo') ? document.getElementById('s21_batismo').value : '',
@@ -4725,7 +4731,7 @@ function salvarCartaoS21(membroId, grupo, meses) {
     miss: document.getElementById('s21_miss') ? document.getElementById('s21_miss').checked : false,
     outrasOvelhas: document.getElementById('s21_outrasOvelhas') ? document.getElementById('s21_outrasOvelhas').checked : false,
     ungido: document.getElementById('s21_ungido') ? document.getElementById('s21_ungido').checked : false,
-  };
+  });
   dados[key] = info;
   salvarS21Dados(dados);
   // Update totals
@@ -5321,41 +5327,23 @@ function renderS21ResumoCat(cat, anoInicioParam) {
 
   // Seletor de 5 anos
   var anoAtualInicio = (new Date().getMonth() >= 8) ? new Date().getFullYear() : new Date().getFullYear() - 1;
-  // Primeira aba = ano de servico anterior (consulta); as setas andam 5 anos
-  var baseAnos = anoAtualInicio - 1 + s21AnoOffset;
-  var anoInicio = anoInicioParam !== undefined ? anoInicioParam : (s21AnoOffset === 0 ? anoAtualInicio : baseAnos);
+  // 3 anos: retrasado (vermelho, pode apagar), anterior (azul) e atual (verde)
+  var anoInicio = anoInicioParam !== undefined ? anoInicioParam : anoAtualInicio;
 
   // Tabs de anos com navegacao
   var anoTabsDiv = document.createElement('div');
   anoTabsDiv.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;align-items:center';
 
-  // Botao anterior
-  var btnPrevCat = document.createElement('button');
-  btnPrevCat.textContent = '◀';
-  btnPrevCat.style.cssText = 'padding:8px 12px;border:2px solid var(--border);border-radius:8px;background:white;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer';
-  btnPrevCat.onclick = function() { s21AnoOffset -= 5; renderS21ResumoCat(cat, anoAtualInicio - 1 + s21AnoOffset + 4); };
-  anoTabsDiv.appendChild(btnPrevCat);
-
-  for (var i = 0; i < 5; i++) {
-    (function(a) {
-      var btn = document.createElement('button');
-      btn.textContent = getAnoServicoLabel(a);
-      btn.style.cssText = 'padding:8px 14px;border:2px solid ' +
-        (a === anoInicio ? 'var(--ink)' : 'var(--border)') +
-        ';border-radius:8px;background:' + (a === anoInicio ? 'var(--ink)' : 'white') +
-        ';color:' + (a === anoInicio ? 'var(--cream)' : 'var(--ink)') +
-        ';font-size:13px;font-weight:500;cursor:pointer;font-family:"DM Sans",sans-serif';
-      btn.onclick = function() { renderS21ResumoCat(cat, a); };
-      anoTabsDiv.appendChild(btn);
-    })(baseAnos + i);
-  }
-
-  // Botao proximo
-  var btnNextCat = document.createElement('button');
-  btnNextCat.textContent = '▶';
-  btnNextCat.style.cssText = 'padding:8px 12px;border:2px solid var(--border);border-radius:8px;background:white;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer';
-  btnNextCat.onclick = function() { s21AnoOffset += 5; renderS21ResumoCat(cat, anoAtualInicio - 1 + s21AnoOffset); };
-  anoTabsDiv.appendChild(btnNextCat);
+  getUltimosAnosServico().forEach(function(a) {
+    var cor = corAnoS21(a), ativo = (a === anoInicio);
+    var btn = document.createElement('button');
+    btn.textContent = getAnoServicoLabel(a);
+    btn.style.cssText = 'padding:8px 14px;border:2px solid ' + cor + ';border-radius:8px;background:' +
+      (ativo ? cor : 'white') + ';color:' + (ativo ? 'white' : cor) +
+      ';font-size:13px;font-weight:' + (ativo ? '700' : '600') + ';cursor:pointer;font-family:"DM Sans",sans-serif';
+    btn.onclick = function() { renderS21ResumoCat(cat, a); };
+    anoTabsDiv.appendChild(btn);
+  });
 
   container.appendChild(anoTabsDiv);
 
@@ -5569,6 +5557,15 @@ function renderS21ResumoCat(cat, anoInicioParam) {
   btnBar.appendChild(btnPrint);
   btnBar.appendChild(btnWA);
   btnBar.appendChild(btnGmail);
+  // Apagar o ano inteiro desta categoria: so o ano em vermelho
+  if (anoInicio < anoAtualInicio - 1) {
+    var btnDelCat = document.createElement('button');
+    btnDelCat.className = 's21-btn';
+    btnDelCat.style.cssText = 'padding:10px 16px;background:white;color:var(--red);border:1.5px solid var(--red);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer';
+    btnDelCat.textContent = '🗑️ Apagar ' + getAnoServicoLabel(anoInicio);
+    btnDelCat.onclick = (function(cc, ai){ return function(){ apagarAnoCategoriaS21(cat, cc, ai); }; })(c, anoInicio);
+    btnBar.appendChild(btnDelCat);
+  }
   card.appendChild(btnBar);
 
   var footer = document.createElement('div');
