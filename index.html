@@ -1872,8 +1872,8 @@ function renderListas() {
   var nav = document.getElementById('listaAbas'), box = document.getElementById('listaConteudo');
   if (!nav || !box) return;
   if (listaAtual === 'remocoes' && !podeVerRemocoes()) listaAtual = 'inativos';
-  var abas = [['inativos', '🗂️ S-21 Inativos'], ['contatos', '🚨 Contatos de Emergência']];
-  if (podeVerRemocoes()) abas.splice(1, 0, ['remocoes', '🔒 Remoções']);
+  var abas = [['inativos', '🗂️ S-21 Inativos'], ['mudados', '🚚 Mudaram-se'], ['contatos', '🚨 Contatos de Emergência']];
+  if (podeVerRemocoes()) abas.splice(2, 0, ['remocoes', '🔒 Remoções']);
   nav.innerHTML = '';
   abas.forEach(function(a) {
     var b = document.createElement('button'), ativo = (a[0] === listaAtual);
@@ -1884,26 +1884,33 @@ function renderListas() {
     nav.appendChild(b);
   });
   box.innerHTML = '';
-  if (listaAtual === 'inativos') renderInativos(box);
+  if (listaAtual === 'inativos') renderInativos(box, false);
+  else if (listaAtual === 'mudados') renderInativos(box, true);
   else if (listaAtual === 'remocoes') renderRemocoes(box);
   else renderContatos(box);
 }
 
 // ---------- S-21 Publicadores Inativos ----------
-function renderInativos(box) {
-  var lista = lerLista('inativos');
+// Inativos e "Mudaram-se" ficam na mesma lista na nuvem, separados pela marca mudouSe
+function renderInativos(box, mudados) {
+  var lista = lerLista('inativos').filter(function(m){ return !!m.mudouSe === !!mudados; });
   var opts = '';
   getGrupos().forEach(function(g) {
     (MEMBROS[g] || []).forEach(function(m) { opts += '<option value="' + esc(g) + '|' + m.id + '">' + esc(m.nome) + ' (' + esc(g) + ')</option>'; });
   });
   var grupoOpts = getGrupos().map(function(g){ return '<option value="' + esc(g) + '">' + esc(g) + '</option>'; }).join('');
-  var html = '<div class="section-divider">🗂️ S-21 — Publicadores Inativos (' + lista.length + ')</div>' +
+  var html = mudados
+    ? '<div class="section-divider">🚚 S-21 — Publicadores que se mudaram (' + lista.length + ')</div>' +
+      '<div class="card" style="padding:14px;margin-bottom:12px"><div style="font-size:12px;color:#777;margin-bottom:4px">Publicador ativo que se mudou para outra congregação (o cartão S-21 e todo o histórico continuam com ele):</div>' +
+      '<select id="mudMover" style="' + EST_IN + '"><option value="">Escolha o publicador...</option>' + opts + '</select>' +
+      '<div style="font-size:12px;color:#777;margin-top:8px">Também dá para usar o botão 🚚 Mudou-se direto no cartão S-21 do publicador.</div></div>'
+    : '<div class="section-divider">🗂️ S-21 — Publicadores Inativos (' + lista.length + ')</div>' +
     '<div class="card" style="padding:14px;margin-bottom:12px">' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><div style="flex:1;min-width:170px"><input id="inaNome" placeholder="Nome do publicador inativo" style="' + EST_IN + '"></div>' +
     '<button id="inaAdd" style="' + BTN_ESC + '">+ Adicionar</button></div>' +
     '<div style="font-size:12px;color:#777;margin-bottom:4px">Ou mova um publicador de um grupo (o cartão S-21 e todo o histórico continuam com ele):</div>' +
     '<select id="inaMover" style="' + EST_IN + '"><option value="">Escolha o publicador...</option>' + opts + '</select></div>';
-  if (!lista.length) html += '<div style="color:#aaa;font-size:13px;text-align:center;padding:14px">Nenhum publicador inativo.</div>';
+  if (!lista.length) html += '<div style="color:#aaa;font-size:13px;text-align:center;padding:14px">' + (mudados ? 'Nenhum publicador mudou-se.' : 'Nenhum publicador inativo.') + '</div>';
   lista.forEach(function(m) {
     html += '<div class="card" style="padding:10px 12px;margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
       '<div style="flex:1;min-width:140px;font-weight:600">' + esc(m.nome) + (m.grupoAnterior ? ' <span style="font-weight:400;font-size:11px;color:#999">(era do grupo ' + esc(m.grupoAnterior) + ')</span>' : '') + '</div>' +
@@ -1911,14 +1918,21 @@ function renderInativos(box) {
       (m.mudouSe
         ? '<span style="font-size:12px;font-weight:700;color:#8a5a00;background:#FBF0D9;border-radius:6px;padding:5px 9px">🚚 Mudou-se' + (m.mudouPara ? ' para ' + esc(m.mudouPara) : '') + '</span>' +
           '<button data-enviar="' + m.id + '" style="' + BTN_ESC + ';background:#D44638">📧 Enviar S-21</button>' +
-          '<button data-desmudar="' + m.id + '" style="padding:6px 10px;font-size:12px;border:1.5px solid #bbb;color:#777;border-radius:7px;background:white;cursor:pointer">Desfazer mudança</button>'
+          '<button data-desmudar="' + m.id + '" style="padding:6px 10px;font-size:12px;border:1.5px solid #bbb;color:#777;border-radius:7px;background:white;cursor:pointer">Mover para inativos</button>'
         : '<button data-mudou="' + m.id + '" style="padding:6px 10px;font-size:12px;border:1.5px solid #8a5a00;color:#8a5a00;border-radius:7px;background:white;cursor:pointer">🚚 Mudou-se</button>') +
       '<select data-reativar="' + m.id + '" style="padding:6px 8px;font-size:12px;border:1.5px solid var(--sage);color:var(--sage);border-radius:7px;background:white"><option value="">Reativar em...</option>' + grupoOpts + '</select>' +
       '<button data-excluir="' + m.id + '" style="' + BTN_DEL + '">Excluir</button></div>';
   });
   box.innerHTML = html;
 
-  document.getElementById('inaAdd').onclick = function() {
+  if (mudados) {
+    document.getElementById('mudMover').onchange = function() {
+      var v = this.value; this.value = '';
+      if (!v) return;
+      marcarMudouSeDoGrupo(v.split('|')[0], parseInt(v.split('|')[1]));
+    };
+  }
+  if (!mudados) document.getElementById('inaAdd').onclick = function() {
     if (!podeEditar()) { avisoSoResponsavel('alterar a lista'); return; }
     var nome = document.getElementById('inaNome').value.trim();
     if (!nome) { alert('Digite o nome.'); return; }
@@ -1928,7 +1942,7 @@ function renderInativos(box) {
     bannerLista(nome + ' adicionado aos inativos.');
     renderListas();
   };
-  document.getElementById('inaMover').onchange = function() {
+  if (!mudados) document.getElementById('inaMover').onchange = function() {
     var v = this.value; this.value = '';
     if (!v) return;
     if (!podeEditar()) { avisoSoResponsavel('alterar a lista'); return; }
@@ -1969,6 +1983,7 @@ function renderInativos(box) {
       if (!m || !confirm('Desfazer a mudança de ' + m.nome + '?')) return;
       m.mudouSe = false; m.mudouPara = ''; m.mudouEm = '';
       gravarLista('inativos', arr);
+      bannerLista(m.nome + ' voltou para a lista de inativos.');
       renderListas();
     };
   });
@@ -2071,9 +2086,34 @@ function enviarS21Mudanca(id) {
   win.document.close();
 }
 
+// Lista de publicadores de um "grupo" do S-21 (inclui os especiais Inativos e Mudaram-se)
+function listaS21Grupo(grupo) {
+  if (grupo === '__inativos') return lerLista('inativos').filter(function(m){ return !m.mudouSe; });
+  if (grupo === '__mudados') return lerLista('inativos').filter(function(m){ return !!m.mudouSe; });
+  return MEMBROS[grupo];
+}
+
+// Publicador ATIVO que se mudou: sai do grupo, vai para "Mudaram-se" e ja pode enviar o S-21
+function marcarMudouSeDoGrupo(g, id) {
+  if (!podeEditar()) { avisoSoResponsavel('marcar mudança'); return; }
+  var m = (MEMBROS[g] || []).find(function(x){ return parseInt(x.id) === id; });
+  if (!m) return;
+  var para = prompt(m.nome + ' mudou-se para qual congregação? (opcional)\n\nEle sai do grupo ' + g + ' e vai para "Mudaram-se". O cartão S-21 e o histórico continuam.', '');
+  if (para === null) return;
+  MEMBROS[g] = MEMBROS[g].filter(function(x){ return parseInt(x.id) !== id; });
+  salvarMembros(); reconstruirGrupoSelect();
+  var arr = lerLista('inativos').filter(function(x){ return parseInt(x.id) !== id; });
+  arr.push({ id: m.id, nome: m.nome, grupoAnterior: g, mudouSe: true, mudouPara: para.trim(), mudouEm: new Date().toISOString().slice(0, 10) });
+  gravarLista('inativos', arr);
+  bannerLista(m.nome + ' marcado como "mudou-se".');
+  if (confirm('Gerar agora o cartão S-21 de ' + m.nome + ' para enviar à nova congregação?')) enviarS21Mudanca(m.id);
+  if (adminTabAtual === 'listas') renderListas(); else abrirS21Inativo(m.id);
+}
+
 function abrirS21Inativo(id) {
   switchAdminTab('s21');
-  document.getElementById('s21GrupoSelect').value = '__inativos';
+  var _mud = lerLista('inativos').some(function(x){ return parseInt(x.id) === id && x.mudouSe; });
+  document.getElementById('s21GrupoSelect').value = _mud ? '__mudados' : '__inativos';
   carregarPublicadoresS21();
   document.getElementById('s21PublicadorSelect').value = String(id);
   abrirS21();
@@ -4385,7 +4425,7 @@ function carregarPublicadoresS21() {
   var sel = document.getElementById('s21PublicadorSelect');
   sel.innerHTML = '<option value="">— Selecione o publicador —</option>';
   document.getElementById('s21CardContainer').innerHTML = '';
-  var listaS21 = grupo === '__inativos' ? lerLista('inativos') : MEMBROS[grupo];
+  var listaS21 = listaS21Grupo(grupo);
   if (!grupo || !listaS21) return;
   listaS21.forEach(function(m) {
     var o = document.createElement('option');
@@ -4400,7 +4440,7 @@ function abrirS21() {
   var grupo = document.getElementById('s21GrupoSelect').value;
   var membroId = parseInt(document.getElementById('s21PublicadorSelect').value);
   if (!membroId || !grupo) return;
-  var membro = (grupo === '__inativos' ? lerLista('inativos') : (MEMBROS[grupo] || [])).find(function(m){ return parseInt(m.id) === membroId; });
+  var membro = (listaS21Grupo(grupo) || []).find(function(m){ return parseInt(m.id) === membroId; });
   if (!membro) return;
 
   var dados = carregarS21Dados();
@@ -4699,6 +4739,26 @@ function abrirS21() {
   ind.style.cssText = 'font-size:12px;font-weight:600;text-align:right;margin:-4px 0 8px;color:var(--sage)';
   ind.textContent = 'Os dados são salvos automaticamente';
   card.insertBefore(ind, card.children[1] || null);
+  // Mudou-se: no cartao de quem esta num grupo (ativo) ou envio do S-21 para quem ja se mudou
+  var barMud = document.createElement('div');
+  barMud.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin:-2px 0 10px';
+  if (grupo === '__mudados') {
+    var infoM = lerLista('inativos').find(function(x){ return parseInt(x.id) === membroId; }) || {};
+    barMud.innerHTML = '<span style="font-size:12px;font-weight:700;color:#8a5a00;background:#FBF0D9;border-radius:6px;padding:7px 10px">🚚 Mudou-se' + (infoM.mudouPara ? ' para ' + esc(infoM.mudouPara) : '') + '</span>';
+    var bEnv = document.createElement('button'); bEnv.type = 'button';
+    bEnv.textContent = '📧 Enviar S-21';
+    bEnv.style.cssText = 'padding:8px 14px;background:#D44638;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer';
+    bEnv.onclick = function(){ enviarS21Mudanca(membroId); };
+    barMud.appendChild(bEnv);
+  } else if (grupo !== '__inativos') {
+    var bMud = document.createElement('button'); bMud.type = 'button';
+    bMud.textContent = '🚚 Mudou-se';
+    bMud.title = 'Use quando o publicador se mudar para outra congregação';
+    bMud.style.cssText = 'padding:8px 14px;background:white;color:#8a5a00;border:1.5px solid #8a5a00;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer';
+    bMud.onclick = function(){ s21SalvarAgora(); marcarMudouSeDoGrupo(grupo, membroId); };
+    barMud.appendChild(bMud);
+  }
+  if (barMud.childNodes.length) card.insertBefore(barMud, card.children[2] || null);
   s21CartaoAberto = membroId;
   card.addEventListener('input', s21AgendarSalvar);
   card.addEventListener('change', s21AgendarSalvar);
@@ -5801,7 +5861,7 @@ function abrirS21Cat(cat) {
   var grupo = document.getElementById('s21' + cat + 'GrupoSelect').value;
   var membroId = parseInt(document.getElementById('s21' + cat + 'PublicadorSelect').value);
   if (!membroId || !grupo) return;
-  var membro = (grupo === '__inativos' ? lerLista('inativos') : (MEMBROS[grupo] || [])).find(function(m){ return parseInt(m.id) === membroId; });
+  var membro = (listaS21Grupo(grupo) || []).find(function(m){ return parseInt(m.id) === membroId; });
   if (!membro) return;
 
   // Titulo especifico por categoria
@@ -6319,8 +6379,11 @@ switchAdminTab = function(tab) {
       Object.keys(MEMBROS).forEach(function(g) {
         var o = document.createElement('option'); o.value=g; o.textContent=g; sel.appendChild(o);
       });
-      if (lerLista('inativos').length) {
+      if (listaS21Grupo('__inativos').length) {
         var oi = document.createElement('option'); oi.value = '__inativos'; oi.textContent = 'Inativos'; sel.appendChild(oi);
+      }
+      if (listaS21Grupo('__mudados').length) {
+        var om = document.createElement('option'); om.value = '__mudados'; om.textContent = 'Mudaram-se'; sel.appendChild(om);
       }
     }
   }
