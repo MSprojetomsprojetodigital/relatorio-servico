@@ -1908,6 +1908,11 @@ function renderInativos(box) {
     html += '<div class="card" style="padding:10px 12px;margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
       '<div style="flex:1;min-width:140px;font-weight:600">' + esc(m.nome) + (m.grupoAnterior ? ' <span style="font-weight:400;font-size:11px;color:#999">(era do grupo ' + esc(m.grupoAnterior) + ')</span>' : '') + '</div>' +
       '<button data-s21="' + m.id + '" style="' + BTN_ESC + ';background:var(--blue)">📋 Abrir S-21</button>' +
+      (m.mudouSe
+        ? '<span style="font-size:12px;font-weight:700;color:#8a5a00;background:#FBF0D9;border-radius:6px;padding:5px 9px">🚚 Mudou-se' + (m.mudouPara ? ' para ' + esc(m.mudouPara) : '') + '</span>' +
+          '<button data-enviar="' + m.id + '" style="' + BTN_ESC + ';background:#D44638">📧 Enviar S-21</button>' +
+          '<button data-desmudar="' + m.id + '" style="padding:6px 10px;font-size:12px;border:1.5px solid #bbb;color:#777;border-radius:7px;background:white;cursor:pointer">Desfazer mudança</button>'
+        : '<button data-mudou="' + m.id + '" style="padding:6px 10px;font-size:12px;border:1.5px solid #8a5a00;color:#8a5a00;border-radius:7px;background:white;cursor:pointer">🚚 Mudou-se</button>') +
       '<select data-reativar="' + m.id + '" style="padding:6px 8px;font-size:12px;border:1.5px solid var(--sage);color:var(--sage);border-radius:7px;background:white"><option value="">Reativar em...</option>' + grupoOpts + '</select>' +
       '<button data-excluir="' + m.id + '" style="' + BTN_DEL + '">Excluir</button></div>';
   });
@@ -1941,6 +1946,35 @@ function renderInativos(box) {
   box.querySelectorAll('[data-s21]').forEach(function(b) {
     b.onclick = function(){ abrirS21Inativo(parseInt(b.getAttribute('data-s21'))); };
   });
+  // Mudou-se: marca o inativo como transferido para outra congregacao
+  box.querySelectorAll('[data-mudou]').forEach(function(b) {
+    b.onclick = function() {
+      if (!podeEditar()) { avisoSoResponsavel('alterar a lista'); return; }
+      var id = parseInt(b.getAttribute('data-mudou'));
+      var arr = lerLista('inativos'), m = arr.find(function(x){ return parseInt(x.id) === id; });
+      if (!m) return;
+      var para = prompt('Para qual congregação ' + m.nome + ' se mudou? (opcional)', m.mudouPara || '');
+      if (para === null) return;
+      m.mudouSe = true; m.mudouPara = para.trim(); m.mudouEm = new Date().toISOString().slice(0, 10);
+      gravarLista('inativos', arr);
+      bannerLista(m.nome + ' marcado como "mudou-se". Agora você pode enviar o cartão S-21.');
+      renderListas();
+    };
+  });
+  box.querySelectorAll('[data-desmudar]').forEach(function(b) {
+    b.onclick = function() {
+      if (!podeEditar()) { avisoSoResponsavel('alterar a lista'); return; }
+      var id = parseInt(b.getAttribute('data-desmudar'));
+      var arr = lerLista('inativos'), m = arr.find(function(x){ return parseInt(x.id) === id; });
+      if (!m || !confirm('Desfazer a mudança de ' + m.nome + '?')) return;
+      m.mudouSe = false; m.mudouPara = ''; m.mudouEm = '';
+      gravarLista('inativos', arr);
+      renderListas();
+    };
+  });
+  box.querySelectorAll('[data-enviar]').forEach(function(b) {
+    b.onclick = function(){ enviarS21Mudanca(parseInt(b.getAttribute('data-enviar'))); };
+  });
   box.querySelectorAll('[data-reativar]').forEach(function(sel) {
     sel.onchange = function() {
       var g = sel.value, id = parseInt(sel.getAttribute('data-reativar')); sel.value = '';
@@ -1971,6 +2005,70 @@ function renderInativos(box) {
       });
     };
   });
+}
+
+// Cartao S-21 no formato original (S-21-T) para enviar a outra congregacao quando o publicador se muda.
+// Envia o ano de servico anterior (se tiver relatorios) e o atual, com os dados pessoais originais.
+// O campo "Chegou a congregacao em" e de controle interno e nunca sai no cartao.
+function enviarS21Mudanca(id) {
+  var m = lerLista('inativos').find(function(x){ return parseInt(x.id) === id; });
+  if (!m) return;
+  var info = carregarS21Dados()[getS21Key(id)] || {};
+  var nome = info.nome || m.nome;
+  var atual = getAnoInicioAtual();
+  var doPub = function(r){ return parseInt(r.id) === id; };
+  var anos = [atual - 1, atual].filter(function(a){ return a === atual || temRelatoriosNoAno(a, doPub); });
+  var ck = function(v){ return v ? '☑' : '☐'; };
+  var win = window.open('', '_blank');
+  if (!win) { alert('O navegador bloqueou a janela. Permita pop-ups para este site e tente de novo.'); return; }
+  var css = 'body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:0;padding:24px}' +
+    '.cartao{max-width:760px;margin:0 auto 30px;page-break-after:always}.cartao:last-of-type{page-break-after:auto}' +
+    'h1{text-align:center;font-size:18px;letter-spacing:.3px;margin:0 0 16px}' +
+    '.cab{display:grid;grid-template-columns:1fr auto;gap:4px 24px;font-size:13px;margin-bottom:8px}' +
+    '.cab b{font-weight:700}.cab .ck{white-space:nowrap}.cab .ck span{margin-right:18px}' +
+    '.priv{font-size:13px;font-weight:700;display:flex;flex-wrap:wrap;gap:6px 20px;margin:4px 0 12px}' +
+    'table{width:100%;border-collapse:collapse;font-size:12px}' +
+    'th,td{border:1px solid #000;padding:5px 6px}th{font-size:11px;font-weight:700;text-align:center;vertical-align:middle}' +
+    'td.c{text-align:center}td.mes{text-align:left}' +
+    '.tot td{border:none}.tot td.lbl{text-align:right;font-weight:700}.tot td.box{border:1px solid #000;text-align:center;font-weight:700}' +
+    '.rod{font-size:9px;margin-top:6px}' +
+    '.instr{max-width:760px;margin:0 auto 20px;background:#FBF5E5;border-left:4px solid #C9A227;padding:10px 14px;font-size:13px;line-height:1.5}' +
+    '.bts a,.bts button{display:inline-block;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;border:none;cursor:pointer;margin:4px 6px 0 0}' +
+    '@media print{.instr{display:none}body{padding:0}}';
+  var h = '<html><head><meta charset="UTF-8"><title>S-21 - ' + esc(nome) + '</title><style>' + css + '</style></head><body>';
+  var assunto = 'Cartão S-21 - ' + nome;
+  var corpo = 'Prezados irmãos,\n\nSegue em anexo o Registro de Publicador de Congregação (S-21) de ' + nome +
+    (m.mudouPara ? ', que se mudou para a congregação ' + m.mudouPara : ', que se mudou para a sua congregação') +
+    ', referente ' + (anos.length > 1 ? 'aos anos de serviço ' + (anos[0] + 1) + ' e ' + (anos[1] + 1) : 'ao ano de serviço ' + (anos[0] + 1)) +
+    '.\n\nCom amor cristão,';
+  h += '<div class="instr"><b>Como enviar:</b><br>1. Clique em <b>Salvar PDF</b> e, na janela que abrir, escolha <b>"Salvar como PDF"</b>.<br>' +
+    '2. Clique em <b>Abrir Gmail</b>: o e-mail já vem com assunto e texto. Anexe o PDF salvo (ícone de clipe 📎) e envie ao secretário da outra congregação.' +
+    '<div class="bts"><button onclick="window.print()" style="background:#1A1714;color:#fff">🖨️ Salvar PDF</button>' +
+    '<a target="_blank" style="background:#D44638;color:#fff" href="https://mail.google.com/mail/?view=cm&fs=1&su=' + encodeURIComponent(assunto) + '&body=' + encodeURIComponent(corpo) + '">📧 Abrir Gmail</a></div></div>';
+  anos.forEach(function(a) {
+    var meses = getAnosServico(a), totHrs = 0;
+    h += '<div class="cartao"><h1>REGISTRO DE PUBLICADOR DE CONGREGAÇÃO</h1>' +
+      '<div class="cab"><div><b>Nome:</b> ' + esc(nome) + '</div><div></div>' +
+      '<div><b>Data de nascimento:</b> ' + esc(info.nascimento || '') + '</div><div class="ck"><span>' + ck(info.sexo !== 'F') + ' <b>Masculino</b></span><span>' + ck(info.sexo === 'F') + ' <b>Feminino</b></span></div>' +
+      '<div><b>Data de batismo:</b> ' + esc(info.batismo || '') + '</div><div class="ck"><span>' + ck(info.outrasOvelhas) + ' <b>Outras ovelhas</b></span><span>' + ck(info.ungido) + ' <b>Ungido</b></span></div></div>' +
+      '<div class="priv"><span>' + ck(info.anciao) + ' Ancião</span><span>' + ck(info.servo) + ' Servo ministerial</span><span>' + ck(info.pionReg) + ' Pioneiro regular</span><span>' + ck(info.pionEsp) + ' Pioneiro especial</span><span>' + ck(info.miss) + ' Missionário em campo</span></div>' +
+      '<table><thead><tr><th style="width:17%">Ano de serviço<br><span style="font-size:14px;font-weight:400">' + (a + 1) + '</span></th><th style="width:12%">Participou no ministério</th><th style="width:12%">Estudos bíblicos</th><th style="width:12%">Pioneiro auxiliar</th><th style="width:13%">Horas<br><span style="font-weight:400;font-size:9px">(Se for pioneiro ou missionário em campo)</span></th><th>Observações</th></tr></thead><tbody>';
+    meses.forEach(function(ms) {
+      var rel = RELATORIOS.find(function(r){ var d = new Date(r.envio); return doPub(r) && d.getMonth() === ms.mes && d.getFullYear() === ms.ano; });
+      var part = rel && (rel.participou === true || rel.participou === 'true');
+      var est = rel ? (parseInt(rel.estudos) || 0) : 0;
+      var hrs = rel ? (parseInt(rel.horas) || 0) : 0;
+      var aux = rel && (rel.categoria === 'Auxiliar' || rel.categoria === 'Pioneiro Auxiliar');
+      totHrs += hrs;
+      h += '<tr><td class="mes">' + ms.label + '</td><td class="c">' + ck(part) + '</td><td class="c">' + (rel && (est || part) ? (est || '') : '') +
+        '</td><td class="c">' + ck(aux) + '</td><td class="c">' + (hrs || '') + '</td><td>' + esc(rel ? (rel.obs || '') : '') + '</td></tr>';
+    });
+    h += '</tbody><tfoot><tr class="tot"><td colspan="4" class="lbl">Total</td><td class="box">' + (totHrs || '') + '</td><td class="box"></td></tr></tfoot></table>' +
+      '<div class="rod">S-21-T 11/23</div></div>';
+  });
+  h += '</body></html>';
+  win.document.write(h);
+  win.document.close();
 }
 
 function abrirS21Inativo(id) {
@@ -4538,7 +4636,9 @@ function abrirS21() {
   grid.appendChild(campo('Nome', 'nome', info.nome));
   grid.appendChild(campo('Data de Nascimento', 'nascimento', info.nascimento));
   grid.appendChild(campo('Data de Batismo', 'batismo', info.batismo));
+  var _mudou = lerLista('inativos').some(function(x){ return parseInt(x.id) === membroId && x.mudouSe; });
   var campoCh = campo('Chegou à congregação em (MM/AAAA)', 'chegada', info.chegada);
+  if (_mudou) campoCh.style.display = 'none'; // controle interno: some quando o publicador se mudou
   campoCh.querySelector('input').placeholder = 'Ex.: 10/2026 (deixe vazio se sempre foi daqui)';
   campoCh.title = 'Relatórios anteriores a este mês ficam no S-21 para consulta, mas não entram nos totais da congregação.';
   grid.appendChild(campoCh);
