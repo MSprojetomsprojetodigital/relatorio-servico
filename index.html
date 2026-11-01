@@ -3033,9 +3033,33 @@ function checkPin() {
       NUVEM.pedirLogin(function(){ atualizarBotoesAdmin(); });
     }
   } else {
+    // Aparelho novo (ou app recem-instalado): ainda nao recebeu o PIN da nuvem.
+    // Pede o login primeiro; depois que o PIN chega, confere de novo o mesmo PIN digitado.
+    if (!temPinNuvem() && window.NUVEM && NUVEM.online && !NUVEM.adminNuvem && NUVEM.pedirLogin) {
+      alert('Primeiro acesso neste aparelho.\n\nEntre com o seu e-mail e senha (responsável ou ajudante). Depois disso, o seu PIN passa a valer aqui.');
+      NUVEM.pedirLogin(function(){ esperarPinDaNuvem(val, 0); });
+      return;
+    }
     document.getElementById('pinError').style.display = 'block';
     document.getElementById('pinInput').value = '';
   }
+  });
+}
+
+// Depois do login num aparelho novo: espera o PIN chegar da nuvem e confere de novo
+function esperarPinDaNuvem(val, tentativa) {
+  if (!temPinNuvem() && tentativa < 30) { setTimeout(function(){ esperarPinDaNuvem(val, tentativa + 1); }, 400); return; }
+  conferirPin(val).then(function(ok) {
+    if (ok) {
+      adminUnlocked = true;
+      closePinOverlay();
+      switchMode('admin');
+      atualizarBotoesAdmin();
+    } else {
+      document.getElementById('pinOverlay').style.display = 'flex';
+      document.getElementById('pinError').style.display = 'block';
+      document.getElementById('pinInput').value = '';
+    }
   });
 }
 
