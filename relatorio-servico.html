@@ -2074,7 +2074,7 @@ function enviarS21Mudanca(id) {
       var est = rel ? (parseInt(rel.estudos) || 0) : 0;
       var hrs = rel ? (parseInt(rel.horas) || 0) : 0;
       var aux = rel && (rel.categoria === 'Auxiliar' || rel.categoria === 'Pioneiro Auxiliar');
-      totHrs += hrs; totCredM += creditoRel(rel);
+      totHrs += hrs; if (info.pionReg || info.auxCont) totCredM += creditoRel(rel);
       h += '<tr><td class="mes">' + ms.label + '</td><td class="c">' + ck(part) + '</td><td class="c">' + (rel && (est || part) ? (est || '') : '') +
         '</td><td class="c">' + ck(aux) + '</td><td class="c">' + (hrs || '') + '</td><td>' + esc(rel ? (rel.obs || '') : '') + '</td></tr>';
     });
@@ -4504,8 +4504,8 @@ function abrirS21() {
       '</tr></thead>';
     var tbody = document.createElement('tbody');
     var totEstudos = 0, totHoras = 0, totCred = 0;
-    // Pioneiro regular ou ano com algum mes de auxiliar: mostra o campo de credito de horas
-    var ehPioneiro = info.pionReg || meses.some(function(m){ var r = relPorMes[m.mes + '_' + m.ano]; return r && (r.categoria === 'Regular' || r.categoria === 'Auxiliar'); });
+    // Credito de horas: so pioneiro regular ou pioneiro auxiliar continuo
+    var ehPioneiro = !!(info.pionReg || info.auxCont);
 
     meses.forEach(function(m) {
       var chaveRel = m.mes + '_' + m.ano;
@@ -4516,7 +4516,7 @@ function abrirS21() {
       var obsBase = rel ? (rel.obs || '') : '';
       var naoParticipou = rel && !participou;
       var isAux = rel && (rel.categoria === 'Auxiliar' || rel.categoria === 'Pioneiro Auxiliar');
-      var cred = creditoRel(rel);
+      var cred = ehPioneiro ? creditoRel(rel) : 0;
       if (rel) { totEstudos += estudos; totHoras += horas; totCred += cred; }
 
       var tr = document.createElement('tr');
@@ -4728,6 +4728,12 @@ function abrirS21() {
   checks.appendChild(chk('Servo ministerial', 'servo', info.servo));
   checks.appendChild(chk('Pioneiro regular', 'pionReg', info.pionReg));
   checks.appendChild(chk('Pioneiro especial', 'pionEsp', info.pionEsp));
+  // Controle interno (nao sai no cartao impresso/enviado): libera o credito de horas
+  var chkAuxC = chk('Pioneiro auxiliar contínuo', 'auxCont', info.auxCont);
+  chkAuxC.title = 'Só para controle: libera o crédito de horas no S-21. Não aparece no cartão impresso nem enviado.';
+  chkAuxC.querySelector('label').style.color = '#8a6d00';
+  chkAuxC.querySelector('input').addEventListener('change', function(){ s21SalvarAgora(); setTimeout(abrirS21, 50); });
+  checks.appendChild(chkAuxC);
   checks.appendChild(chk('Missionário em campo', 'miss', info.miss));
   checks.appendChild(chk('Outras ovelhas', 'outrasOvelhas', info.outrasOvelhas));
   checks.appendChild(chk('Ungido', 'ungido', info.ungido));
@@ -4825,7 +4831,7 @@ function imprimirS21Ano(nome, info, anoInicio, meses, relPorMes) {
   meses.forEach(function(m) {
     var chave = m.mes + '_' + m.ano;
     var rel = relPorMes[chave] || null;
-    totCredP += creditoRel(rel);
+    if (info.pionReg || info.auxCont) totCredP += creditoRel(rel);
     var participou = rel ? (rel.participou===true||rel.participou==='true') : false;
     var est = rel ? (parseInt(rel.estudos)||0) : 0;
     var hrs = rel ? (parseInt(rel.horas)||0) : 0;
@@ -4868,7 +4874,7 @@ function autoSalvarDadosPessoaisS21(membroId) {
     var el = document.getElementById('s21_' + c);
     if (el) infoAtual[c] = el.value;
   });
-  var checks = ['anciao','servo','pionReg','pionEsp','miss','outrasOvelhas','ungido'];
+  var checks = ['anciao','servo','pionReg','pionEsp','miss','outrasOvelhas','ungido','auxCont'];
   checks.forEach(function(c) {
     var el = document.getElementById('s21_' + c);
     if (el) infoAtual[c] = el.checked;
@@ -4970,6 +4976,7 @@ function salvarCartaoS21(membroId, grupo, meses) {
     miss: document.getElementById('s21_miss') ? document.getElementById('s21_miss').checked : false,
     outrasOvelhas: document.getElementById('s21_outrasOvelhas') ? document.getElementById('s21_outrasOvelhas').checked : false,
     ungido: document.getElementById('s21_ungido') ? document.getElementById('s21_ungido').checked : false,
+    auxCont: document.getElementById('s21_auxCont') ? document.getElementById('s21_auxCont').checked : !!((dados[key] || {}).auxCont),
   });
   dados[key] = info;
   salvarS21Dados(dados);
