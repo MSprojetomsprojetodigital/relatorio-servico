@@ -1,0 +1,25 @@
+{
+  "id": "formulario-publicador",
+  "name": "Enviar Relatório",
+  "short_name": "Relatório",
+  "start_url": "formulario-publicador.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#3D8FD6",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "icone-relatorio-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icone-relatorio.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
