@@ -4549,14 +4549,6 @@ function abrirS21() {
       inpHrs.type = 'number'; inpHrs.id = 's21_hrs_' + m.mes + '_' + m.ano;
       inpHrs.value = horas || ''; inpHrs.min = '0'; inpHrs.style.width = '50px';
       tdHrs.appendChild(inpHrs);
-      if (ehPioneiro) {
-        var inpCred = document.createElement('input');
-        inpCred.type = 'number'; inpCred.id = 's21_cred_' + m.mes + '_' + m.ano;
-        inpCred.value = cred || ''; inpCred.min = '0'; inpCred.placeholder = 'créd.';
-        inpCred.title = 'Crédito de horas (escola de pioneiros, assembleia, congresso, hospedagem...)';
-        inpCred.style.cssText = 'width:50px;display:block;margin:3px auto 0;font-size:11px;border:1px dashed #C9A227;border-radius:4px';
-        tdHrs.appendChild(inpCred);
-      }
 
       var tdObs = document.createElement('td');
       if (naoParticipou) {
@@ -4575,6 +4567,20 @@ function abrirS21() {
         inpObs3.value = obsBase; inpObs3.placeholder = '...';
         inpObs3.style.cssText = 'width:100%;border:1px solid var(--border);border-radius:4px;padding:3px 5px;font-size:11px';
         tdObs.appendChild(inpObs3);
+      }
+
+      // Credito de horas fica na coluna Observacoes (nao se mistura com as horas de campo)
+      if (ehPioneiro) {
+        var credWrap = document.createElement('div');
+        credWrap.style.cssText = 'display:flex;align-items:center;gap:5px;margin-top:4px;font-size:11px;color:#8a6d00';
+        credWrap.innerHTML = '<span>Crédito de horas:</span>';
+        var inpCred = document.createElement('input');
+        inpCred.type = 'number'; inpCred.id = 's21_cred_' + m.mes + '_' + m.ano;
+        inpCred.value = cred || ''; inpCred.min = '0'; inpCred.placeholder = '0';
+        inpCred.title = 'Crédito de horas (escola de pioneiros, assembleia, congresso, hospedagem...)';
+        inpCred.style.cssText = 'width:52px;font-size:11px;border:1px dashed #C9A227;border-radius:4px;padding:2px 4px';
+        credWrap.appendChild(inpCred);
+        tdObs.appendChild(credWrap);
       }
 
       tr.appendChild(tdMes); tr.appendChild(tdPart); tr.appendChild(tdEst);
