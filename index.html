@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Relatório de Serviço de Campo</title>
+<link rel="apple-touch-icon" href="icone-ancioes-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-ancioes-192.png">
+<link rel="manifest" href="manifest-ancioes.json">
+<meta name="apple-mobile-web-app-title" content="Anciãos">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFFFFF">
+<script>
+// O atalho "Anciãos" cuida so desta pagina: quem abre pelo endereco da pasta (.../relatorio-servico/)
+// passa a ver .../index.html, sem recarregar, para o celular oferecer "Instalar".
+(function(){ try { if (/\/$/.test(location.pathname)) history.replaceState(null, '', location.pathname + 'index.html' + location.search + location.hash); } catch (e) {} })();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1320,7 +1332,7 @@
     <button class="admin-tab active" onclick="switchAdminTab('resumo')">📊 Resumo</button>
     <button class="admin-tab" onclick="switchAdminTab('historico')">📅 Histórico</button>
     <button class="admin-tab" onclick="switchAdminTab('publicadores')">👥 Publicadores</button>
-    <button class="admin-tab" onclick="switchAdminTab('administracao')">⚙️ Administração</button>
+    <button class="admin-tab" onclick="switchAdminTab('administracao')">⚙️ Anciãos</button>
     <button class="admin-tab" onclick="switchAdminTab('s21')">📋 S-21</button>
     <button class="admin-tab" onclick="switchAdminTab('s21reg')">🟤 P. Regular</button>
     <button class="admin-tab" onclick="switchAdminTab('s21aux')">🟢 P. Auxiliar</button>

@@ -1,0 +1,25 @@
+{
+  "id": "ancioes",
+  "name": "Anciãos — Relatório de Serviço",
+  "short_name": "Anciãos",
+  "start_url": "index.html",
+  "scope": "index.html",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "icone-ancioes-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icone-ancioes.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
