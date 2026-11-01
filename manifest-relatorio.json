@@ -3,7 +3,7 @@
   "name": "Enviar Relatório",
   "short_name": "Relatório",
   "start_url": "formulario-publicador.html",
-  "scope": "./",
+  "scope": "formulario-publicador.html",
   "display": "standalone",
   "background_color": "#FFFFFF",
   "theme_color": "#3D8FD6",

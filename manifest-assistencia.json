@@ -3,7 +3,7 @@
   "name": "Registrar Assistência",
   "short_name": "Assistência",
   "start_url": "s3-indicador.html",
-  "scope": "./",
+  "scope": "s3-indicador.html",
   "display": "standalone",
   "background_color": "#FFFFFF",
   "theme_color": "#8DC63F",
