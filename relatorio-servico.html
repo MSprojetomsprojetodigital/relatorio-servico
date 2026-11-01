@@ -2061,7 +2061,7 @@ function enviarS21Mudanca(id) {
     '<div class="bts"><button onclick="window.print()" style="background:#1A1714;color:#fff">🖨️ Salvar PDF</button>' +
     '<a target="_blank" style="background:#D44638;color:#fff" href="https://mail.google.com/mail/?view=cm&fs=1&su=' + encodeURIComponent(assunto) + '&body=' + encodeURIComponent(corpo) + '">📧 Abrir Gmail</a></div></div>';
   anos.forEach(function(a) {
-    var meses = getAnosServico(a), totHrs = 0;
+    var meses = getAnosServico(a), totHrs = 0, totCredM = 0;
     h += '<div class="cartao"><h1>REGISTRO DE PUBLICADOR DE CONGREGAÇÃO</h1>' +
       '<div class="cab"><div><b>Nome:</b> ' + esc(nome) + '</div><div></div>' +
       '<div><b>Data de nascimento:</b> ' + esc(info.nascimento || '') + '</div><div class="ck"><span>' + ck(info.sexo !== 'F') + ' <b>Masculino</b></span><span>' + ck(info.sexo === 'F') + ' <b>Feminino</b></span></div>' +
@@ -2074,11 +2074,11 @@ function enviarS21Mudanca(id) {
       var est = rel ? (parseInt(rel.estudos) || 0) : 0;
       var hrs = rel ? (parseInt(rel.horas) || 0) : 0;
       var aux = rel && (rel.categoria === 'Auxiliar' || rel.categoria === 'Pioneiro Auxiliar');
-      totHrs += hrs;
+      totHrs += hrs; totCredM += creditoRel(rel);
       h += '<tr><td class="mes">' + ms.label + '</td><td class="c">' + ck(part) + '</td><td class="c">' + (rel && (est || part) ? (est || '') : '') +
         '</td><td class="c">' + ck(aux) + '</td><td class="c">' + (hrs || '') + '</td><td>' + esc(rel ? (rel.obs || '') : '') + '</td></tr>';
     });
-    h += '</tbody><tfoot><tr class="tot"><td colspan="4" class="lbl">Total</td><td class="box">' + (totHrs || '') + '</td><td class="box"></td></tr></tfoot></table>' +
+    h += '</tbody><tfoot><tr class="tot"><td colspan="4" class="lbl">Total</td><td class="box">' + (totHrs || '') + '</td><td class="box" style="text-align:left">' + textoCreditoTotal(totCredM, totHrs) + '</td></tr></tfoot></table>' +
       '<div class="rod">S-21-T 11/23</div></div>';
   });
   h += '</body></html>';
@@ -4503,7 +4503,9 @@ function abrirS21() {
       '<th>Observações</th>' +
       '</tr></thead>';
     var tbody = document.createElement('tbody');
-    var totEstudos = 0, totHoras = 0;
+    var totEstudos = 0, totHoras = 0, totCred = 0;
+    // Pioneiro regular ou ano com algum mes de auxiliar: mostra o campo de credito de horas
+    var ehPioneiro = info.pionReg || meses.some(function(m){ var r = relPorMes[m.mes + '_' + m.ano]; return r && (r.categoria === 'Regular' || r.categoria === 'Auxiliar'); });
 
     meses.forEach(function(m) {
       var chaveRel = m.mes + '_' + m.ano;
@@ -4514,7 +4516,8 @@ function abrirS21() {
       var obsBase = rel ? (rel.obs || '') : '';
       var naoParticipou = rel && !participou;
       var isAux = rel && (rel.categoria === 'Auxiliar' || rel.categoria === 'Pioneiro Auxiliar');
-      if (rel) { totEstudos += estudos; totHoras += horas; }
+      var cred = creditoRel(rel);
+      if (rel) { totEstudos += estudos; totHoras += horas; totCred += cred; }
 
       var tr = document.createElement('tr');
       if (naoParticipou) tr.style.background = '#FFF5F5';
@@ -4546,6 +4549,14 @@ function abrirS21() {
       inpHrs.type = 'number'; inpHrs.id = 's21_hrs_' + m.mes + '_' + m.ano;
       inpHrs.value = horas || ''; inpHrs.min = '0'; inpHrs.style.width = '50px';
       tdHrs.appendChild(inpHrs);
+      if (ehPioneiro) {
+        var inpCred = document.createElement('input');
+        inpCred.type = 'number'; inpCred.id = 's21_cred_' + m.mes + '_' + m.ano;
+        inpCred.value = cred || ''; inpCred.min = '0'; inpCred.placeholder = 'créd.';
+        inpCred.title = 'Crédito de horas (escola de pioneiros, assembleia, congresso, hospedagem...)';
+        inpCred.style.cssText = 'width:50px;display:block;margin:3px auto 0;font-size:11px;border:1px dashed #C9A227;border-radius:4px';
+        tdHrs.appendChild(inpCred);
+      }
 
       var tdObs = document.createElement('td');
       if (naoParticipou) {
@@ -4575,7 +4586,8 @@ function abrirS21() {
     var trTotal = document.createElement('tr');
     trTotal.className = 's21-total-row';
     trTotal.innerHTML = '<td colspan="2" style="text-align:right">Total</td>' +
-      '<td>' + totEstudos + '</td><td></td><td>' + totHoras + '</td><td></td>';
+      '<td id="s21_tot_est_' + meses[0].ano + '">' + totEstudos + '</td><td></td><td id="s21_tot_hrs_' + meses[0].ano + '">' + totHoras + '</td>' +
+      '<td id="s21_tot_obs_' + meses[0].ano + '" style="text-align:left;font-size:12px">' + textoCreditoTotal(totCred, totHoras) + '</td>';
     tbody.appendChild(trTotal);
     table.appendChild(tbody);
     tabelaContainer.appendChild(table);
@@ -4803,10 +4815,11 @@ function imprimirS21Ano(nome, info, anoInicio, meses, relPorMes) {
   win.document.write('</div>');
   // Tabela
   win.document.write('<table><thead><tr><th>Mês</th><th>Participou no Ministério</th><th>Estudos Bíblicos</th><th>Pioneiro Auxiliar</th><th>Horas</th><th>Observações</th></tr></thead><tbody>');
-  var totEst = 0, totHrs = 0;
+  var totEst = 0, totHrs = 0, totCredP = 0;
   meses.forEach(function(m) {
     var chave = m.mes + '_' + m.ano;
     var rel = relPorMes[chave] || null;
+    totCredP += creditoRel(rel);
     var participou = rel ? (rel.participou===true||rel.participou==='true') : false;
     var est = rel ? (parseInt(rel.estudos)||0) : 0;
     var hrs = rel ? (parseInt(rel.horas)||0) : 0;
@@ -4825,7 +4838,7 @@ function imprimirS21Ano(nome, info, anoInicio, meses, relPorMes) {
     win.document.write('<td style="text-align:left">' + obsHtml + '</td>');
     win.document.write('</tr>');
   });
-  win.document.write('<tr class="total"><td colspan="2" style="text-align:right">Total</td><td>' + totEst + '</td><td></td><td>' + totHrs + '</td><td></td></tr>');
+  win.document.write('<tr class="total"><td colspan="2" style="text-align:right">Total</td><td>' + totEst + '</td><td></td><td>' + totHrs + '</td><td style="text-align:left">' + textoCreditoTotal(totCredP, totHrs) + '</td></tr>');
   win.document.write('</tbody></table>');
   win.document.write('<div class="rodape">S-21-T 11/23</div>');
   win.document.write('<br><button onclick="window.print()">Imprimir / Salvar PDF</button>');
@@ -4920,6 +4933,21 @@ function apagarAnoS21(membroId, nome, anoInicio, meses) {
   });
 }
 
+// Credito de horas (pioneiros): usa o campo "credito" do relatorio; se nao houver,
+// le da observacao ("Credito: 17h", "credito 30 horas" ou, nos regulares, "Equipe de assembleia 5 horas").
+function creditoRel(rel) {
+  if (!rel) return 0;
+  if (rel.credito !== undefined && rel.credito !== null && rel.credito !== '') return parseInt(rel.credito) || 0;
+  var obs = String(rel.obs || '');
+  var m = /cr[ée]dito\D{0,3}(\d+)/i.exec(obs);
+  if (m) return parseInt(m[1]) || 0;
+  if (rel.categoria === 'Regular') { m = /(\d+)\s*h(?:oras?)?\b/i.exec(obs); if (m) return parseInt(m[1]) || 0; }
+  return 0;
+}
+function textoCreditoTotal(cred, horas) {
+  return cred > 0 ? 'Crédito de horas ' + cred + '+' + horas + '= ' + (cred + horas) : '';
+}
+
 function salvarCartaoS21(membroId, grupo, meses) {
   var dados = carregarS21Dados();
   var key = getS21Key(membroId);
@@ -4939,18 +4967,40 @@ function salvarCartaoS21(membroId, grupo, meses) {
   });
   dados[key] = info;
   salvarS21Dados(dados);
-  // Update totals
-  var totEst = 0, totHrs = 0;
+  // Grava os meses do ano (participou, estudos, auxiliar, horas, credito, observacao)
+  var membroObj = (listaS21Grupo(grupo) || []).find(function(x){ return parseInt(x.id) === membroId; }) || {};
+  var agoraIso = new Date().toISOString(), mudouAlgo = false;
+  var totEst = 0, totHrs = 0, totCred = 0;
   meses.forEach(function(m) {
-    var e = document.getElementById('s21_est_' + m.mes + '_' + m.ano);
-    var h = document.getElementById('s21_hrs_' + m.mes + '_' + m.ano);
-    totEst += e ? (parseInt(e.value)||0) : 0;
-    totHrs += h ? (parseInt(h.value)||0) : 0;
+    var g = function(p){ return document.getElementById('s21_' + p + '_' + m.mes + '_' + m.ano); };
+    if (!g('part')) return;
+    var part = g('part').checked, aux = g('aux') && g('aux').checked;
+    var est = parseInt(g('est').value) || 0, hrs = parseInt(g('hrs').value) || 0;
+    var cEl = g('cred'), cred = cEl ? (parseInt(cEl.value) || 0) : null;
+    var obs = g('obs') ? g('obs').value : '';
+    totEst += est; totHrs += hrs; totCred += (cred || 0);
+    var idx = RELATORIOS.findIndex(function(r){ var d = new Date(r.envio); return parseInt(r.id) === membroId && d.getMonth() === m.mes && d.getFullYear() === m.ano; });
+    var rel = idx >= 0 ? RELATORIOS[idx] : null;
+    if (!rel && !part && !est && !hrs && !cred && !obs) return; // mes vazio: nada a gravar
+    var cat = info.pionReg ? 'Regular' : (aux ? 'Auxiliar' : 'Publicador');
+    if (rel && rel.categoria === 'Regular' && !aux) cat = 'Regular';
+    var novo = Object.assign({}, rel || { id: membroId, nome: membroObj.nome || info.nome, grupo: grupo,
+      envio: new Date(m.ano, m.mes, 15, 12, 0, 0).toISOString(), enviadoEm: agoraIso,
+      mesRef: m.ano + '-' + String(m.mes + 1).padStart(2, '0') }, {
+      participou: part, estudos: est, horas: hrs, obs: obs, categoria: cat });
+    if (cred !== null) novo.credito = cred;
+    if (JSON.stringify(novo) !== JSON.stringify(rel)) {
+      if (idx >= 0) RELATORIOS[idx] = novo; else RELATORIOS.push(novo);
+      mudouAlgo = true;
+    }
   });
-  var te = document.getElementById('s21_tot_est');
-  var th = document.getElementById('s21_tot_hrs');
-  if (te) te.textContent = totEst;
-  if (th) th.textContent = totHrs;
+  if (mudouAlgo) salvarDados();
+  var tObs = document.getElementById('s21_tot_obs_' + meses[0].ano);
+  var tHrs = document.getElementById('s21_tot_hrs_' + meses[0].ano);
+  var tEst = document.getElementById('s21_tot_est_' + meses[0].ano);
+  if (tEst) tEst.textContent = totEst;
+  if (tHrs) tHrs.textContent = totHrs;
+  if (tObs) tObs.textContent = textoCreditoTotal(totCred, totHrs);
   // Mostra confirmacao visual
   var banner = document.createElement('div');
   banner.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:var(--sage);color:white;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.2)';
