@@ -5291,15 +5291,18 @@ function renderS3Tabela() {
     return '<strong>' + val + '</strong>';
   }
 
+  var OCAS_CURTA = { 'Visita do superintendente': 'Visita sup.', 'Discurso especial': 'Disc. especial', 'Celebração': 'Celebração', 'Assembleia': 'Assembleia', 'Congresso': 'Congresso' };
   function makeRow(label, vals, bgLabel, bgData, tipo) {
     var calc = calcRow(vals);
+    var ocs = (mesData.ocasiao && mesData.ocasiao[tipo]) || [];
     var tr = document.createElement('tr');
     var totalCell = calc.count > 0 ? '<strong style="color:var(--warm)">' + calc.total + '</strong>' : '<span style="color:#ccc">—</span>';
     var mediaCell = calc.media !== null ? '<strong style="color:var(--sage)">' + calc.media + '</strong>' : '<span style="color:#ccc">—</span>';
     tr.innerHTML =
       '<td style="padding:12px 10px;background:' + bgLabel + ';font-weight:600;font-size:13px;border-bottom:1px solid var(--border)">' + label + '</td>' +
       vals.map(function(v, i) {
-        return '<td onclick="editarCelulaS3(\'' + mesKey + '\',\'' + tipo + '\',' + i + ')" title="Toque para corrigir ou apagar" style="cursor:pointer;padding:12px 8px;text-align:center;background:' + bgData + ';border-bottom:1px solid var(--border);border-left:1px solid var(--border)">' + celVal(v) + '</td>';
+        return '<td onclick="editarCelulaS3(\'' + mesKey + '\',\'' + tipo + '\',' + i + ')" title="Toque para corrigir ou apagar" style="cursor:pointer;padding:12px 8px;text-align:center;background:' + bgData + ';border-bottom:1px solid var(--border);border-left:1px solid var(--border)">' + celVal(v) +
+          (ocs[i] ? '<div style="font-size:10px;color:#8a5a00;font-weight:600;margin-top:2px">' + (OCAS_CURTA[ocs[i]] || ocs[i]) + '</div>' : '') + '</td>';
       }).join('') +
       '<td style="padding:12px 8px;text-align:center;background:#FBF5E5;border-bottom:1px solid var(--border);border-left:1px solid var(--border)">' + totalCell + '</td>' +
       '<td style="padding:12px 8px;text-align:center;background:#FBF5E5;border-bottom:1px solid var(--border);border-left:1px solid var(--border)">' + mediaCell + '</td>';

@@ -748,8 +748,9 @@
     <!-- DATA -->
     <div class="form-row">
       <label>Data da Reunião</label>
+      <div id="mesRapido" style="display:flex;gap:6px;margin-bottom:8px"></div>
       <input type="date" id="dataReuniao" onchange="aoMudarData()">
-      <div style="font-size:11px;color:#999;margin-top:4px">O mês e a semana são escolhidos pela data. Confira abaixo.</div>
+      <div style="font-size:11px;color:#999;margin-top:4px">O mês e a semana são escolhidos pela data. Confira abaixo. Para corrigir o mês passado, toque em "Mês anterior".</div>
     </div>
 
     <!-- SEMANA -->
@@ -770,6 +771,20 @@
       <input type="number" class="assistencia-input" id="assistenciaInput"
         min="0" max="9999" placeholder="0" inputmode="numeric">
       <div class="assistencia-hint">Presencial + Transmissão</div>
+    </div>
+
+    <!-- OCASIAO ESPECIAL -->
+    <div class="form-row">
+      <label>Ocasião especial (opcional)</label>
+      <select id="ocasiaoSel" style="width:100%;padding:12px;font-size:15px;border:1.5px solid var(--border);border-radius:10px;background:white">
+        <option value="">Reunião normal</option>
+        <option>Visita do superintendente</option>
+        <option>Discurso especial</option>
+        <option>Celebração</option>
+        <option>Assembleia</option>
+        <option>Congresso</option>
+      </select>
+      <div style="font-size:11px;color:#999;margin-top:4px">Só para saber que naquela semana houve essa ocasião. Em semana de <b>assembleia</b> ou <b>congresso</b> não há reunião: escolha a ocasião e deixe o número de presentes em branco.</div>
     </div>
 
     <button class="btn-enviar" onclick="enviar()">✅ Registrar Assistência</button>
@@ -814,6 +829,21 @@ document.addEventListener('DOMContentLoaded', function() {
   var inp = document.getElementById('dataReuniao');
   inp.value = hoje;
   inp.max = hoje; // nao permite data futura
+  // Permite voltar ate o 1o dia do mes anterior (para o indicador corrigir o mes passado)
+  var ant = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+  inp.min = ant.getFullYear() + '-' + String(ant.getMonth()+1).padStart(2,'0') + '-01';
+  var box = document.getElementById('mesRapido');
+  [['Mês anterior (' + MESES[ant.getMonth()] + ')', ant], ['Este mês (' + MESES[agora.getMonth()] + ')', agora]].forEach(function(p, i) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = p[0];
+    b.style.cssText = 'flex:1;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:13px;cursor:pointer';
+    b.onclick = function() {
+      var d = i === 0 ? new Date(ant.getFullYear(), ant.getMonth() + 1, 0) : agora; // ultimo dia do mes anterior ou hoje
+      inp.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      aoMudarData();
+      if (i === 0) alert('Mês anterior: agora escolha no calendário a data exata da reunião que quer corrigir.');
+    };
+    box.appendChild(b);
+  });
   aoMudarData();
 
   renderHistorico();
@@ -883,8 +913,28 @@ function salvarS3MesData(mesKey, mesData) {
 }
 
 // ── ENVIAR ────────────────────────────────────────────────────────────────
+var OCASIAO_CURTA = { 'Visita do superintendente': 'Visita sup.', 'Discurso especial': 'Disc. especial',
+  'Celebração': 'Celebração', 'Assembleia': 'Assembleia', 'Congresso': 'Congresso' };
+
 function enviar() {
-  var assistencia = parseInt(document.getElementById('assistenciaInput').value);
+  var ocasiao = document.getElementById('ocasiaoSel').value;
+  var semReuniao = (ocasiao === 'Assembleia' || ocasiao === 'Congresso');
+  var txtAss = document.getElementById('assistenciaInput').value;
+  var assistencia = parseInt(txtAss);
+  if (semReuniao && txtAss === '') {
+    // Semana sem reuniao: grava so a ocasiao (nao entra na media nem no S-88)
+    var mk = getMesKey(), md = getS3MesData(mk);
+    if (!md.ocasiao) md.ocasiao = { semana: [null,null,null,null,null], fds: [null,null,null,null,null] };
+    md.ocasiao.semana[semanaAtual] = ocasiao;
+    md.ocasiao.fds[semanaAtual] = ocasiao;
+    salvarS3MesData(mk, md);
+    document.getElementById('successDetail').innerHTML = '<strong>' + ocasiao + '</strong><br>' + (semanaAtual + 1) + 'a semana de ' +
+      document.getElementById('mesBadge').textContent + '<br>Semana marcada sem reunião.';
+    document.getElementById('formCard').style.display = 'none';
+    document.getElementById('successCard').style.display = 'block';
+    renderHistorico();
+    return;
+  }
   if (isNaN(assistencia) || assistencia < 0) {
     alert('Digite o número de presentes.');
     return;
@@ -892,6 +942,8 @@ function enviar() {
 
   var mesKey = getMesKey();
   var mesData = getS3MesData(mesKey);
+  if (!mesData.ocasiao) mesData.ocasiao = { semana: [null,null,null,null,null], fds: [null,null,null,null,null] };
+  mesData.ocasiao[tipoAtual][semanaAtual] = ocasiao || null;
   var jaTinha = mesData[tipoAtual][semanaAtual];
   if (jaTinha !== null && jaTinha !== undefined && jaTinha !== '' && parseInt(jaTinha) !== assistencia) {
     var nomeT = tipoAtual === 'semana' ? 'meio da semana' : 'fim de semana';
@@ -915,6 +967,7 @@ function enviar() {
   document.getElementById('successDetail').innerHTML =
     '<strong>' + tipos[tipoAtual] + '</strong><br>' +
     semanas[semanaAtual] + ' semana de ' + document.getElementById('mesBadge').textContent + (dataFmt ? ' — ' + dataFmt : '') + '<br>' +
+    (ocasiao ? '<span style="color:#8a5a00;font-weight:600">' + ocasiao + '</span><br>' : '') +
     '<span style="font-size:22px;color:var(--ink);font-family:\'Cormorant Garamond\',serif">' + assistencia + '</span> presentes';
 
   document.getElementById('formCard').style.display = 'none';
@@ -927,6 +980,7 @@ function novoRegistro() {
   document.getElementById('formCard').style.display = 'block';
   document.getElementById('successCard').style.display = 'none';
   document.getElementById('assistenciaInput').value = '';
+  document.getElementById('ocasiaoSel').value = '';
   document.getElementById('assistenciaInput').focus();
 }
 
@@ -954,6 +1008,7 @@ function renderHistorico() {
 
   rows.forEach(function(row) {
     var vals = mesData[row.key];
+    var ocs = (mesData.ocasiao && mesData.ocasiao[row.key]) || [];
     var preenchidos = vals.filter(function(v){ return v !== null && v !== undefined; });
     var total = preenchidos.reduce(function(a,b){ return a + (parseInt(b)||0); }, 0);
     var media = preenchidos.length > 0 ? fmtMedia(total/preenchidos.length) : null;
@@ -970,6 +1025,7 @@ function renderHistorico() {
       html += '<div style="text-align:center;padding:8px 4px;border-radius:6px;background:' + (hasVal ? '#EAF2EE' : 'white') + ';border:1px solid ' + (hasVal ? 'var(--sage)' : 'var(--border)') + '">';
       html += '<div style="font-size:9px;color:#999;margin-bottom:2px">' + semLabels[i] + '</div>';
       html += '<div style="font-size:14px;font-weight:' + (hasVal ? '600' : '400') + ';color:' + (hasVal ? 'var(--sage)' : '#ccc') + '">' + (hasVal ? v : '—') + '</div>';
+      if (ocs[i]) html += '<div style="font-size:9px;color:#8a5a00;font-weight:600;margin-top:2px;line-height:1.1">' + (OCASIAO_CURTA[ocs[i]] || ocs[i]) + '</div>';
       html += '</div>';
     }
     html += '</div>';
