@@ -5334,7 +5334,7 @@ function renderS3Tabela() {
     return '<strong>' + val + '</strong>';
   }
 
-  var OCAS_CURTA = { 'Visita do superintendente': 'Visita sup.', 'Discurso especial': 'Disc. especial', 'Celebração': 'Celebração', 'Assembleia': 'Assembleia', 'Congresso': 'Congresso' };
+  var OCAS_CURTA = { 'Visita do superintendente': 'Visita sup.', 'Discurso especial': 'Disc. especial', 'Reunião especial': 'Reun. especial', 'Celebração': 'Celebração', 'Assembleia': 'Assembleia', 'Congresso': 'Congresso' };
   function makeRow(label, vals, bgLabel, bgData, tipo) {
     var calc = calcRow(vals);
     var ocs = (mesData.ocasiao && mesData.ocasiao[tipo]) || [];
