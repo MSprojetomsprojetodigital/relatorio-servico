@@ -1055,7 +1055,7 @@
       var perm = e && /permission/i.test(String(e.message || e.code));
       if (!N.pronto) semNuvem(perm ? 'permissao' : e);
       else if (perm && adminNuvem && !ehDono()) status('Conta não autorizada: peça ao responsável', '#C0392B');
-      else status(perm ? 'Sem permissão para ler ' + ({relatorios:'relatórios', s88:'S-88', membros:'grupos', s3:'S-3', config:'configurações', s21:'S-21', 'acesso/chave':'a chave', inativos:'inativos', contatos:'contatos', remocoes:'remoções', visitas61:'S-61'}[c] || c) : 'Erro de conexão', '#C0392B');
+      else status(perm ? 'Sem permissão para ler ' + ({relatorios:'relatórios', s88:'S-88', membros:'grupos', s3:'S-3', config:'configurações', s21:'S-21', 'acesso/chave':'a chave', inativos:'inativos', contatos:'contatos', remocoes:'resgatar', visitas61:'S-61'}[c] || c) : 'Erro de conexão', '#C0392B');
     });
   }
 
@@ -1885,7 +1885,7 @@ function renderListas() {
   if (!nav || !box) return;
   if (listaAtual === 'remocoes' && !podeVerRemocoes()) listaAtual = 'inativos';
   var abas = [['inativos', '🗂️ S-21 Inativos'], ['mudados', '🚚 Mudaram-se'], ['contatos', '🚨 Contatos de Emergência']];
-  if (podeVerRemocoes()) abas.splice(2, 0, ['remocoes', '🔒 Remoções']);
+  if (podeVerRemocoes()) abas.splice(2, 0, ['remocoes', '🔒 Resgatar']);
   nav.innerHTML = '';
   abas.forEach(function(a) {
     var b = document.createElement('button'), ativo = (a[0] === listaAtual);
@@ -2177,26 +2177,21 @@ function adicionarItemLista(t, modelo) {
 // ---------- Remocoes (somente o responsavel) ----------
 function renderRemocoes(box) {
   var lista = lerLista('remocoes');
-  var html = '<div class="section-divider">🔒 Remoções (' + lista.length + ')</div>' +
+  var html = '<div class="section-divider">🔒 Resgatar (' + lista.length + ')</div>' +
     '<div style="background:#FBF5E5;border:1px solid var(--gold);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--warm);margin-bottom:10px">Lista confidencial: visível somente para o responsável e os ajudantes autorizados. Publicadores e indicador não têm acesso.</div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">' +
     '<button id="remAdd" style="' + BTN_ESC + '">+ Adicionar nome</button>' +
     '<span id="listaSalvoInd" style="font-size:12px;font-weight:600;color:var(--sage)">Os dados são salvos automaticamente</span></div>';
   if (!lista.length) html += '<div style="color:#aaa;font-size:13px;text-align:center;padding:14px">Nenhum registro.</div>';
+  // Lista simples: so o nome de cada pessoa
   lista.forEach(function(it) {
-    html += '<div class="card" style="padding:12px 14px;margin-bottom:10px">' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">' +
-      campoLista('Nome', it, 'nome', 'text', true) +
-      campoLista('Comissão: Presidente', it, 'presidente') +
-      campoLista('Comissão: 2º ancião', it, 'anciao2') +
-      campoLista('Comissão: 3º ancião', it, 'anciao3') +
-      campoLista('Data do anúncio da remoção', it, 'dataAnuncio', 'date') +
-      campoLista('Observações', it, 'obs', 'area', true) +
-      '</div><div style="text-align:right;margin-top:8px"><button data-excluir-item="' + esc(it.id) + '" style="' + BTN_DEL + '">Excluir</button></div></div>';
+    html += '<div class="card" style="padding:8px 12px;margin-bottom:6px;display:flex;gap:8px;align-items:center">' +
+      '<input data-item="' + esc(it.id) + '" data-campo="nome" type="text" value="' + esc(it.nome) + '" list="listaNomesPub" placeholder="Nome" aria-label="Nome" style="' + EST_IN + ';flex:1">' +
+      '<button data-excluir-item="' + esc(it.id) + '" style="' + BTN_DEL + '">Excluir</button></div>';
   });
   box.innerHTML = html + datalistNomes();
   document.getElementById('remAdd').onclick = function() {
-    adicionarItemLista('remocoes', { nome: '', presidente: '', anciao2: '', anciao3: '', dataAnuncio: '', obs: '' });
+    adicionarItemLista('remocoes', { nome: '' });
   };
   ligarEventosLista(box, 'remocoes');
 }
