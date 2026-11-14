@@ -1192,6 +1192,16 @@
 <body>
 
 <!-- ADMIN PIN OVERLAY -->
+<!-- TELA FECHADA: area dos Anciaos fechada, login continua -->
+<div id="telaFechada" style="display:none;position:fixed;inset:0;z-index:150;background:var(--cream);align-items:center;justify-content:center;padding:24px;text-align:center;font-family:'DM Sans',sans-serif">
+  <div style="max-width:340px">
+    <img src="icone-ancioes-192.png" alt="" width="96" height="96" style="border-radius:22px;box-shadow:0 2px 10px rgba(0,0,0,.12)">
+    <h2 style="font-family:'Cormorant Garamond',serif;font-size:28px;margin:18px 0 6px;color:var(--ink)">Área dos Anciãos fechada</h2>
+    <p style="font-size:14px;color:#666;line-height:1.5;margin:0 0 22px">Você continua conectado. Para abrir de novo, basta o PIN.<br>Para fechar o app, use o gesto do celular.</p>
+    <button onclick="switchMode('admin')" style="padding:13px 28px;background:#1565C0;color:#FFFFFF;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🔐 Entrar com PIN</button>
+  </div>
+</div>
+
 <div class="pin-overlay" id="pinOverlay">
   <div class="pin-box">
     <div style="font-size:32px;margin-bottom:8px">🔐</div>
@@ -1233,6 +1243,7 @@
   <button class="mode-btn active" onclick="switchMode('user')">Publicador</button>
   <button class="mode-btn" onclick="switchMode('admin')">Anciãos</button>
 </div>
+<button id="btnFecharTopo" onclick="fecharAncioes()" title="Fecha a área dos Anciãos sem sair da conta. Para voltar, só o PIN." style="display:none;margin-top:20px;padding:8px 14px;background:#1565C0;color:#FFFFFF;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">🔒 Fechar</button>
 <button id="btnTrocarPinTopo" onclick="trocarPin()" style="display:none;margin-top:20px;padding:8px 14px;background:var(--warm);color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer">🔑 Trocar PIN</button>
 <button id="btnLoginNuvem" onclick="if(window.NUVEM){ NUVEM.adminNuvem ? (confirm('Sair da conta de administrador neste aparelho?') && NUVEM.sair()) : NUVEM.pedirLogin(atualizarBotoesAdmin); }" style="display:none;margin-top:20px;padding:8px 14px;background:#888;color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer"></button>
 <div id="nuvemStatusSlot" style="margin-top:20px"></div>
@@ -3071,6 +3082,8 @@ document.addEventListener('keydown', function(e) {
 
 function atualizarBotoesAdmin() {
   var admin = (currentMode === 'admin');
+  var btnFechar = document.getElementById('btnFecharTopo');
+  if (btnFechar) btnFechar.style.display = (currentMode === 'admin') ? 'inline-block' : 'none';
   var btnPin = document.getElementById('btnTrocarPinTopo');
   if (btnPin) btnPin.style.display = admin ? 'inline-block' : 'none';
   var btnLog = document.getElementById('btnLoginNuvem');
@@ -3082,6 +3095,30 @@ function atualizarBotoesAdmin() {
   }
 }
 
+// ============= FECHAR A AREA DOS ANCIAOS (sem sair da conta) =============
+// Salva o que estiver aberto, tranca com o PIN e mostra a tela "fechada".
+// O login (e-mail/senha) continua: para voltar, so o PIN.
+var MINUTOS_BLOQUEIO = 10;      // sem uso por esse tempo: fecha sozinho
+var ultimaAtividade = Date.now();
+function marcarAtividade() { ultimaAtividade = Date.now(); }
+function fecharAncioes(automatico) {
+  try { if (typeof s21SalvarAgora === 'function') s21SalvarAgora(); } catch (e) {}
+  try { if (typeof listaSalvarAgora === 'function') listaSalvarAgora(); } catch (e) {}
+  adminUnlocked = false;
+  switchMode('user');
+  var tf = document.getElementById('telaFechada');
+  if (tf) tf.style.display = 'flex';
+  if (!automatico) { try { window.close(); } catch (e) {} } // alguns apps instalados aceitam fechar
+}
+['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(function(ev) {
+  document.addEventListener(ev, marcarAtividade, { passive: true, capture: true });
+});
+function conferirBloqueio() {
+  if (currentMode === 'admin' && adminUnlocked && Date.now() - ultimaAtividade > MINUTOS_BLOQUEIO * 60000) fecharAncioes(true);
+}
+setInterval(conferirBloqueio, 30000);
+document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') conferirBloqueio(); });
+
 // ============= MODE =============
 function switchMode(mode) {
   if (mode === 'admin' && !adminUnlocked) {
@@ -3090,6 +3127,7 @@ function switchMode(mode) {
     return;
   }
   currentMode = mode;
+  if (mode === 'admin') { var tf = document.getElementById('telaFechada'); if (tf) tf.style.display = 'none'; marcarAtividade(); }
   document.querySelectorAll('.mode-btn').forEach((b, i) => {
     b.classList.toggle('active', (i === 0 && mode === 'user') || (i === 1 && mode === 'admin'));
   });
