@@ -1017,7 +1017,7 @@ function renderHistorico() {
   rows.forEach(function(row) {
     var vals = mesData[row.key];
     var ocs = (mesData.ocasiao && mesData.ocasiao[row.key]) || [];
-    var preenchidos = vals.filter(function(v){ return v !== null && v !== undefined; });
+    var preenchidos = vals.filter(function(v){ return v !== null && v !== undefined && (parseInt(v)||0) > 0; });
     var total = preenchidos.reduce(function(a,b){ return a + (parseInt(b)||0); }, 0);
     var media = preenchidos.length > 0 ? fmtMedia(total/preenchidos.length) : null;
 

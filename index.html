@@ -5271,7 +5271,7 @@ function salvarS3MesData(mesKey, mesData) {
 function sincronizarMesS88(mesKey, mesData) {
   // Calcula totais do mes para o S-88
   function calcTipo(vals) {
-    var pre = (vals||[]).filter(function(v){ return v!==null&&v!==undefined&&v!==''; });
+    var pre = (vals||[]).filter(function(v){ return v!==null&&v!==undefined&&v!==''&&(parseInt(v)||0)>0; });
     var total = pre.reduce(function(a,b){ return a+(parseInt(b)||0); }, 0);
     return { qtd: pre.length, total: total, media: pre.length>0?total/pre.length:0 };
   }
@@ -5356,7 +5356,7 @@ function renderS3Tabela() {
 
   // Calcula totais e medias
   function calcRow(vals) {
-    var preenchidos = vals.filter(function(v){ return v !== null && v !== undefined && v !== ''; });
+    var preenchidos = vals.filter(function(v){ return v !== null && v !== undefined && v !== '' && (parseInt(v)||0) > 0; });
     var total = preenchidos.reduce(function(s,v){ return s + (parseInt(v)||0); }, 0);
     var media = preenchidos.length > 0 ? fmtMedia(total / preenchidos.length) : null;
     return { total: total, media: media, count: preenchidos.length };
@@ -5397,8 +5397,8 @@ function renderS3Tabela() {
   for (var i=0;i<5;i++) {
     var s = (mesData.semana[i] !== null && mesData.semana[i] !== undefined && mesData.semana[i] !== '') ? parseInt(mesData.semana[i])||0 : null;
     var f = (mesData.fds[i] !== null && mesData.fds[i] !== undefined && mesData.fds[i] !== '') ? parseInt(mesData.fds[i])||0 : null;
-    if (s !== null) allVals.push(s);
-    if (f !== null) allVals.push(f);
+    if (s) allVals.push(s);
+    if (f) allVals.push(f);
   }
   var totalGeral = allVals.reduce(function(a,b){return a+b;},0);
   var mediaGeral = allVals.length > 0 ? fmtMedia(totalGeral/allVals.length) : null;
@@ -5499,7 +5499,7 @@ function finalizarMesS3() {
 
   // Calcula totais
   function calcTipo(vals) {
-    var pre = (vals||[]).filter(function(v){ return v!==null&&v!==undefined&&v!==''; });
+    var pre = (vals||[]).filter(function(v){ return v!==null&&v!==undefined&&v!==''&&(parseInt(v)||0)>0; });
     var total = pre.reduce(function(a,b){ return a+(parseInt(b)||0); }, 0);
     var media = pre.length>0 ? fmtMedia(total/pre.length) : '—';
     return { qtd: pre.length, total: total, media: media };
@@ -5580,7 +5580,7 @@ function imprimirS3(mesKey, nomeMes, cong) {
   if (!win) { alert('O navegador bloqueou a janela de impressão. Permita pop-ups para este site e tente de novo.'); return; }
 
   function calcRow2(vals) {
-    var pre = vals.filter(function(v){ return v!==null&&v!==undefined&&v!==''; });
+    var pre = vals.filter(function(v){ return v!==null&&v!==undefined&&v!==''&&(parseInt(v)||0)>0; });
     var total = pre.reduce(function(a,b){return a+(parseInt(b)||0);},0);
     var media = pre.length>0 ? fmtMedia(total/pre.length) : '—';
     return {total: pre.length>0?total:'—', media: media};
@@ -5629,8 +5629,8 @@ function imprimirS3(mesKey, nomeMes, cong) {
   // Total geral
   var allVals2 = [];
   for(var i=0;i<5;i++){
-    if(mesData.semana[i]!==null&&mesData.semana[i]!==''&&mesData.semana[i]!==undefined) allVals2.push(parseInt(mesData.semana[i])||0);
-    if(mesData.fds[i]!==null&&mesData.fds[i]!==''&&mesData.fds[i]!==undefined) allVals2.push(parseInt(mesData.fds[i])||0);
+    if((parseInt(mesData.semana[i])||0)>0) allVals2.push(parseInt(mesData.semana[i]));
+    if((parseInt(mesData.fds[i])||0)>0) allVals2.push(parseInt(mesData.fds[i]));
   }
   var tg = allVals2.length>0 ? allVals2.reduce(function(a,b){return a+b;},0) : '—';
   var mg = allVals2.length>0 ? fmtMedia(tg/allVals2.length) : '—';
@@ -6258,7 +6258,7 @@ function calcMesS3Int(mes, ano){
   var md = s3['s3_'+mesKey];
   if(!md) return null;
   function calcTipo(vals){
-    var pre=(vals||[]).filter(function(v){return v!==null&&v!==undefined&&v!=='';});
+    var pre=(vals||[]).filter(function(v){return v!==null&&v!==undefined&&v!==''&&(parseInt(v)||0)>0;});
     var total=pre.reduce(function(a,b){return a+(parseInt(b)||0);},0);
     return {qtd:pre.length,total:total,media:pre.length>0?total/pre.length:0};
   }
