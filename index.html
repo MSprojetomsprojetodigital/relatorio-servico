@@ -161,6 +161,10 @@
     transition: border-color 0.2s;
     appearance: none;
   }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238B6F47' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important; background-position: right 12px center !important; padding-right: 34px !important; cursor: pointer;
+  }
 
   select:focus, input:focus, textarea:focus {
     outline: none;
@@ -1711,7 +1715,15 @@
           </div>
           <div class="form-row">
             <label>Semana</label>
-            <select id="s3SemanaNum" style="width:100%;padding:9px 12px;font-size:13px;border:1.5px solid var(--border);border-radius:8px;background:white">
+            <div id="s3SemanaBtns" style="display:flex;gap:6px">
+              <button type="button" data-sem="1" onclick="escolherSemanaS3(1)">1ª</button>
+              <button type="button" data-sem="2" onclick="escolherSemanaS3(2)">2ª</button>
+              <button type="button" data-sem="3" onclick="escolherSemanaS3(3)">3ª</button>
+              <button type="button" data-sem="4" onclick="escolherSemanaS3(4)">4ª</button>
+              <button type="button" data-sem="5" onclick="escolherSemanaS3(5)">5ª</button>
+            </div>
+            <div style="font-size:11px;color:#999;margin-top:4px">Escolhida pela data. Toque para mudar.</div>
+            <select id="s3SemanaNum" style="display:none">
               <option value="1">1ª Semana</option>
               <option value="2">2ª Semana</option>
               <option value="3">3ª Semana</option>
@@ -1726,8 +1738,20 @@
           </div>
           <div class="form-row">
             <label>Data da Reunião</label>
-            <input type="date" id="s3DataReuniao"
+            <input type="date" id="s3DataReuniao" onchange="aoMudarDataS3()"
               style="width:100%;padding:9px 12px;font-size:13px;border:1.5px solid var(--border);border-radius:8px">
+          </div>
+          <div class="form-row" style="grid-column:1 / -1">
+            <label>Ocasião especial (opcional)</label>
+            <select id="s3Ocasiao" style="width:100%;padding:9px 12px;font-size:13px;border:1.5px solid var(--border);border-radius:8px;background-color:white">
+              <option value="">Reunião normal</option>
+              <option>Visita do superintendente</option>
+              <option>Discurso especial</option>
+              <option>Reunião especial</option>
+              <option>Celebração</option>
+              <option>Assembleia</option>
+              <option>Congresso</option>
+            </select>
           </div>
         </div>
         <button onclick="enviarS3()" style="width:100%;padding:12px;background:var(--ink);color:var(--cream);border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
@@ -5541,6 +5565,38 @@ function finalizarMesS3() {
   setTimeout(function(){ if(banner.parentNode) banner.parentNode.removeChild(banner); }, 4000);
 }
 
+function escolherSemanaS3(n) {
+  var sel = document.getElementById('s3SemanaNum'); if (sel) sel.value = String(n);
+  document.querySelectorAll('#s3SemanaBtns button').forEach(function(b) {
+    var on = b.getAttribute('data-sem') === String(n);
+    b.style.cssText = 'flex:1;min-height:40px;padding:8px 0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;' +
+      (on ? 'background:var(--ink);color:var(--cream);border:1.5px solid var(--ink)' : 'background:white;color:var(--ink);border:1.5px solid var(--border)');
+  });
+}
+// A data escolhe a semana (1a a 5a), o tipo (sabado/domingo = fim de semana) e o mes
+function aoMudarDataS3() {
+  var inp = document.getElementById('s3DataReuniao');
+  if (!inp || !inp.value) { escolherSemanaS3(parseInt((document.getElementById('s3SemanaNum') || {}).value) || 1); return; }
+  var p = inp.value.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]);
+  escolherSemanaS3(Math.min(5, Math.ceil(d.getDate() / 7)));
+  var tipo = document.getElementById('s3TipoReuniao');
+  if (tipo) tipo.value = (d.getDay() === 0 || d.getDay() === 6) ? 'fds' : 'semana';
+  var mesSel = document.getElementById('s3MesSelect');
+  var mk = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  if (mesSel && Array.prototype.some.call(mesSel.options, function(o){ return o.value === mk; }) && mesSel.value !== mk) {
+    mesSel.value = mk;
+    if (typeof renderS3Tabela === 'function') renderS3Tabela();
+  }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  var inp = document.getElementById('s3DataReuniao');
+  if (inp && !inp.value) {
+    var h = new Date();
+    inp.value = h.getFullYear() + '-' + String(h.getMonth() + 1).padStart(2, '0') + '-' + String(h.getDate()).padStart(2, '0');
+  }
+  aoMudarDataS3();
+});
+
 function enviarS3() {
   if (!podeEditar()) { avisoSoResponsavel('registrar assistência pelo painel'); return; }
   var mesKey = document.getElementById('s3MesSelect').value;
@@ -5548,14 +5604,21 @@ function enviarS3() {
   var semana = parseInt(document.getElementById('s3SemanaNum').value) - 1; // 0-4
   var assistencia = parseInt(document.getElementById('s3Assistencia').value);
 
+  var ocasiao = (document.getElementById('s3Ocasiao') || {}).value || '';
+  var semReuniao = (ocasiao === 'Assembleia' || ocasiao === 'Congresso');
+
   if (!mesKey) { alert('Selecione o mês.'); return; }
-  if (isNaN(assistencia) || assistencia < 0) { alert('Digite a assistência.'); return; }
+  if (semReuniao && isNaN(assistencia)) assistencia = null; // semana sem reuniao: so marca a ocasiao
+  else if (isNaN(assistencia) || assistencia < 0) { alert('Digite a assistência.'); return; }
 
   var mesData = getS3MesData(mesKey);
-  if (tipo === 'semana') {
-    mesData.semana[semana] = assistencia;
+  if (!mesData.ocasiao) mesData.ocasiao = { semana: [null,null,null,null,null], fds: [null,null,null,null,null] };
+  if (semReuniao && assistencia === null) {
+    mesData.ocasiao.semana[semana] = ocasiao;
+    mesData.ocasiao.fds[semana] = ocasiao;
   } else {
-    mesData.fds[semana] = assistencia;
+    mesData[tipo === 'semana' ? 'semana' : 'fds'][semana] = assistencia;
+    mesData.ocasiao[tipo === 'semana' ? 'semana' : 'fds'][semana] = ocasiao || null;
   }
   salvarS3MesData(mesKey, mesData);
 
@@ -5564,11 +5627,13 @@ function enviarS3() {
   var semanas = ['1a','2a','3a','4a','5a'];
   var msg = document.getElementById('s3EnvioMsg');
   msg.style.display = 'block';
-  msg.textContent = 'Registrado: ' + tipos[tipo] + ' - ' + semanas[semana] + ' Semana - ' + assistencia + ' presentes';
+  msg.textContent = 'Registrado: ' + tipos[tipo] + ' - ' + semanas[semana] + ' Semana - ' +
+    (assistencia === null ? ocasiao + ' (sem reunião)' : assistencia + ' presentes' + (ocasiao ? ' - ' + ocasiao : ''));
   setTimeout(function(){ msg.style.display='none'; }, 3000);
 
   // Limpa campo assistencia
   document.getElementById('s3Assistencia').value = '';
+  if (document.getElementById('s3Ocasiao')) document.getElementById('s3Ocasiao').value = '';
 
   // Atualiza tabela
   renderS3Tabela();
