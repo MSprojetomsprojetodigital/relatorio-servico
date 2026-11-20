@@ -3238,9 +3238,12 @@ function jaEnviouEsteMes(membroId) {
   var ref = mesRefUser || mesRelatorioPadrao();
   return RELATORIOS.some(r => {
     const envio = new Date(r.envio);
-    return r.id === membroId && envio.getMonth() === ref.mes && envio.getFullYear() === ref.ano;
+    return mesmoId(r.id, membroId) && envio.getMonth() === ref.mes && envio.getFullYear() === ref.ano;
   });
 }
+
+function idNum(v) { var n = parseInt(v); return isNaN(n) ? String(v) : n; }
+function mesmoId(a, b) { return idNum(a) === idNum(b); }
 
 function getRelatoriosAtivos() {
   if (!mesFiltroAdmin) return RELATORIOS;
@@ -3314,7 +3317,7 @@ function submitRelatorio() {
   if (participouValue === null) { alert('Por favor, indique se participou de atividade.'); return; }
   if (!categoriaValue) { alert('Por favor, selecione a categoria de serviço.'); return; }
 
-  const membro = MEMBROS[grupo].find(m => m.id === nomeId);
+  const membro = MEMBROS[grupo].find(m => mesmoId(m.id, nomeId));
   const isPioneiro = categoriaValue === 'Regular' || categoriaValue === 'Auxiliar';
   const horas = (isPioneiro && participouValue) ? parseInt(document.getElementById('horasInput').value) || 0 : 0;
   const estudos = participouValue ? parseInt(document.getElementById('estudosInput').value) || 0 : 0;
@@ -3342,7 +3345,7 @@ function submitRelatorio() {
   var idxExistente = -1;
   for (var i = 0; i < RELATORIOS.length; i++) {
     var d = new Date(RELATORIOS[i].envio);
-    if (RELATORIOS[i].id === nomeId &&
+    if (mesmoId(RELATORIOS[i].id, nomeId) &&
         d.getMonth() === mesAtual &&
         d.getFullYear() === anoAtual) {
       idxExistente = i;
@@ -3393,7 +3396,7 @@ function resetForm() {
 // ============= ADMIN =============
 function getStatusColor(membroId) {
   const rel = getRelatoriosAtivos();
-  const submitted = rel.find(r => r.id === membroId);
+  const submitted = rel.find(r => mesmoId(r.id, membroId));
   if (submitted) return 'submitted';
   const isCurrentMonth = mesFiltroAdmin &&
     mesFiltroAdmin.ano === new Date().getFullYear() &&
@@ -3404,7 +3407,7 @@ function getStatusColor(membroId) {
 
 function getDotClass(membroId) {
   const rel = getRelatoriosAtivos();
-  const submitted = rel.find(r => r.id === membroId);
+  const submitted = rel.find(r => mesmoId(r.id, membroId));
   if (submitted) return 'green';
   const isCurrentMonth = mesFiltroAdmin &&
     mesFiltroAdmin.ano === new Date().getFullYear() &&
@@ -3604,8 +3607,8 @@ function renderMesSeletor() {
 function renderStats() {
   const rel = getRelatoriosAtivos();
   const allMembers = Object.values(MEMBROS).flat();
-  const submittedIds = new Set(rel.map(r => r.id));
-  const pendente = allMembers.filter(m => !submittedIds.has(m.id)).length;
+  const submittedIds = new Set(rel.map(r => idNum(r.id)));
+  const pendente = allMembers.filter(m => !submittedIds.has(idNum(m.id))).length;
 
   const regulares = rel.filter(r => r.categoria === 'Regular' && r.participou);
   const auxiliares = rel.filter(r => r.categoria === 'Auxiliar' && r.participou);
@@ -3799,11 +3802,11 @@ function renderNaoParticiparam() {
 }
 
 function renderPendentes() {
-  const submittedIds = new Set(getRelatoriosAtivos().map(r => r.id));
+  const submittedIds = new Set(getRelatoriosAtivos().map(r => idNum(r.id)));
   const allMembers = Object.entries(MEMBROS).flatMap(([grupo, membros]) =>
     membros.map(m => ({ ...m, grupo }))
   );
-  const pendentes = allMembers.filter(m => !submittedIds.has(m.id));
+  const pendentes = allMembers.filter(m => !submittedIds.has(idNum(m.id)));
   const container = document.getElementById('pendentesList');
 
   if (pendentes.length === 0) {
@@ -3962,7 +3965,7 @@ function moverMembro(id, gOrigem, gDestino) {
   var agora = new Date();
   RELATORIOS.forEach(function(r) {
     var d = new Date(r.envio);
-    if (r.id === id && d.getMonth() === agora.getMonth() && d.getFullYear() === agora.getFullYear()) r.grupo = gDestino;
+    if (mesmoId(r.id, id) && d.getMonth() === agora.getMonth() && d.getFullYear() === agora.getFullYear()) r.grupo = gDestino;
   });
   salvarMembros(); salvarDados();
   renderGerenciarGrupos(); reconstruirGrupoSelect(); loadMembros();
@@ -4080,7 +4083,7 @@ function renderGerenciarGrupos() {
           if (!mb) return;
           mb.nome = novoNome;
           mb.tel = inpTel.value.replace(/[^0-9]/g,'');
-          RELATORIOS.forEach(function(r){ if(r.id===id) r.nome=novoNome; });
+          RELATORIOS.forEach(function(r){ if(mesmoId(r.id, id)) r.nome=novoNome; });
           salvarMembros(); salvarDados(); renderGerenciarGrupos(); loadMembros();
         }; })(grupo, m.id, inputNome, inputTel);
 
