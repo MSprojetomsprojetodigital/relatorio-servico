@@ -1489,6 +1489,7 @@
       <button type="button" onclick="compMudarMes(-1)" aria-label="Mês anterior" style="width:40px;height:40px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:18px;cursor:pointer">‹</button>
       <div id="compMesLabel" style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;min-width:200px;text-align:center"></div>
       <button type="button" onclick="compMudarMes(1)" aria-label="Próximo mês" style="width:40px;height:40px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:18px;cursor:pointer">›</button>
+      <button type="button" id="compBtnCorrigir" onclick="compCorrigir=!compCorrigir;renderCompilacao()" style="margin-left:auto;padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:13px;cursor:pointer">✏️ Corrigir categorias</button>
     </div>
     <div style="font-size:12px;color:#888;margin-bottom:14px">Na ordem em que os relatórios chegaram: o mais antigo fica em cima e cada novo envio entra embaixo. Publicadores separados por grupo; pioneiros regulares e auxiliares em listas próprias.</div>
     <div id="compConteudo"></div>
@@ -4337,15 +4338,17 @@ function switchAdminTab(tab) {
 var compMes = null, compLinhas = [];
 // Botao para trocar a categoria do relatorio quando a pessoa marcou errado no formulario
 // (ex.: foi pioneira auxiliar mas enviou como publicadora)
+var compCorrigir = false; // botoes de correcao so aparecem quando o ancião liga "Corrigir categorias"
 function acaoCompilacao(r, ehPioneiroQuadro) {
-  var i = compLinhas.push(r) - 1;
-  var cita = !ehPioneiroQuadro && /pionei?r[oa]s?\s+auxiliar/i.test(String(r.obs || ''));
-  var st = 'margin-left:8px;padding:3px 8px;font-size:11px;border-radius:6px;cursor:pointer;white-space:nowrap;';
   if (r.categoria === 'Regular') return '';
+  var cita = !ehPioneiroQuadro && /pionei?r[oa]s?\s+auxiliar/i.test(String(r.obs || ''));
+  if (!compCorrigir && !cita) return '';
+  var i = compLinhas.push(r) - 1;
+  var st = 'display:inline-block;margin:4px 0 0 8px;padding:4px 10px;font-size:12px;border-radius:6px;cursor:pointer;white-space:nowrap;';
   return ehPioneiroQuadro
-    ? '<button type="button" onclick="compTrocarCategoria(' + i + ',\'Publicador\')" style="' + st + 'border:1px solid var(--border);background:white;color:#666">→ Publicador</button>'
-    : (cita ? '<span style="margin-left:6px;font-size:11px;font-weight:700;color:#8a5a00">⚠️</span>' : '') +
-      '<button type="button" onclick="compTrocarCategoria(' + i + ',\'Auxiliar\')" style="' + st + (cita ? 'border:1.5px solid #2E7D32;background:#EAF5EA;color:#2E7D32;font-weight:700' : 'border:1px solid var(--border);background:white;color:#666') + '">→ P. Auxiliar</button>';
+    ? '<button type="button" onclick="compTrocarCategoria(' + i + ',\'Publicador\')" title="Use se a pessoa NÃO foi pioneira auxiliar neste mês" style="' + st + 'border:1px solid #bbb;background:white;color:#666">Mudar para Publicador</button>'
+    : '<button type="button" onclick="compTrocarCategoria(' + i + ',\'Auxiliar\')" title="Use se a pessoa foi pioneira auxiliar neste mês mas enviou como publicador" style="' + st +
+      (cita ? 'border:1.5px solid #2E7D32;background:#EAF5EA;color:#2E7D32;font-weight:700">⚠️ Foi pioneiro auxiliar? Mudar' : 'border:1px solid #bbb;background:white;color:#666">Mudar para Pioneiro Auxiliar') + '</button>';
 }
 function compTrocarCategoria(i, nova) {
   if (!podeEditar()) { avisoSoResponsavel('mudar a categoria do relatório'); return; }
@@ -4374,6 +4377,8 @@ function renderCompilacao() {
   if (!compMes) compMes = mesRelatorioPadrao();
   var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   document.getElementById('compMesLabel').textContent = MESES[compMes.mes] + ' de ' + compMes.ano;
+  var bc = document.getElementById('compBtnCorrigir');
+  if (bc) { bc.textContent = compCorrigir ? '✔️ Concluir correções' : '✏️ Corrigir categorias'; bc.style.background = compCorrigir ? '#FBF0D9' : 'white'; }
   var quando = function(r) { return new Date(r.enviadoEm || r.envio).getTime(); };
   var rel = getRelatoriosDoMes(compMes.ano, compMes.mes).sort(function(a, b) { return quando(a) - quando(b); });
   var fmtData = function(r) { var d = new Date(r.enviadoEm || r.envio); return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear(); };
