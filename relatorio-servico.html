@@ -4334,7 +4334,36 @@ function switchAdminTab(tab) {
 // ============= COMPILACAO =============
 // Lista dos relatorios do mes na ORDEM DE CHEGADA, separada em tres quadros:
 // Pioneiros Regulares, Pioneiros Auxiliares e Publicadores (cada um no seu quadro).
-var compMes = null;
+var compMes = null, compLinhas = [];
+// Botao para trocar a categoria do relatorio quando a pessoa marcou errado no formulario
+// (ex.: foi pioneira auxiliar mas enviou como publicadora)
+function acaoCompilacao(r, ehPioneiroQuadro) {
+  var i = compLinhas.push(r) - 1;
+  var cita = !ehPioneiroQuadro && /pionei?r[oa]s?\s+auxiliar/i.test(String(r.obs || ''));
+  var st = 'margin-left:8px;padding:3px 8px;font-size:11px;border-radius:6px;cursor:pointer;white-space:nowrap;';
+  if (r.categoria === 'Regular') return '';
+  return ehPioneiroQuadro
+    ? '<button type="button" onclick="compTrocarCategoria(' + i + ',\'Publicador\')" style="' + st + 'border:1px solid var(--border);background:white;color:#666">→ Publicador</button>'
+    : (cita ? '<span style="margin-left:6px;font-size:11px;font-weight:700;color:#8a5a00">⚠️</span>' : '') +
+      '<button type="button" onclick="compTrocarCategoria(' + i + ',\'Auxiliar\')" style="' + st + (cita ? 'border:1.5px solid #2E7D32;background:#EAF5EA;color:#2E7D32;font-weight:700' : 'border:1px solid var(--border);background:white;color:#666') + '">→ P. Auxiliar</button>';
+}
+function compTrocarCategoria(i, nova) {
+  if (!podeEditar()) { avisoSoResponsavel('mudar a categoria do relatório'); return; }
+  var r = compLinhas[i]; if (!r) return;
+  if (nova === 'Auxiliar') {
+    var sug = (String(r.obs || '').match(/(\d+)\s*h/i) || [])[1] || r.horas || '';
+    var h = prompt('Mudar ' + r.nome + ' para Pioneiro Auxiliar neste mês.\n\nQuantas horas?', sug);
+    if (h === null) return;
+    h = parseInt(h);
+    if (isNaN(h) || h < 0) { alert('Digite o número de horas.'); return; }
+    r.categoria = 'Auxiliar'; r.horas = h; r.participou = true;
+  } else {
+    if (!confirm('Mudar ' + r.nome + ' para Publicador neste mês? As horas serão apagadas.')) return;
+    r.categoria = 'Publicador'; r.horas = 0;
+  }
+  salvarDados();
+  renderCompilacao();
+}
 function compMudarMes(passo) {
   if (!compMes) compMes = mesRelatorioPadrao();
   var d = new Date(compMes.ano, compMes.mes + passo, 1);
@@ -4352,6 +4381,7 @@ function renderCompilacao() {
   var ehAux = function(r) { return r.categoria === 'Auxiliar' || r.categoria === 'Pioneiro Auxiliar'; };
   var th = 'padding:9px 10px;font-size:11px;letter-spacing:.5px;text-transform:uppercase;text-align:left;background:var(--ink);color:var(--cream);white-space:nowrap';
   var td = 'padding:9px 10px;font-size:14px;border-bottom:1px solid var(--border);vertical-align:top';
+  compLinhas = [];
   function quadro(titulo, lista, horas) {
     var h = '<div class="section-divider" style="margin-top:18px">' + titulo + ' <span style="font-size:14px;color:#888;font-family:\'DM Sans\',sans-serif">(' + lista.length + ')</span></div>';
     if (!lista.length) return h + '<div style="color:#aaa;font-size:13px;padding:6px 2px 10px">Ninguém enviou ainda.</div>';
@@ -4367,7 +4397,7 @@ function renderCompilacao() {
         '<td style="' + td + ';font-weight:600">' + esc(r.nome) + '</td>' +
         '<td style="' + td + ';text-align:center">' + sim(r) + '</td><td style="' + td + ';text-align:center">' + (e || '') + '</td>' +
         (horas ? '<td style="' + td + ';text-align:center">' + (hr || '') + '</td>' : '') +
-        '<td style="' + td + ';color:#555">' + esc(r.obs || '') + '</td></tr>';
+        '<td style="' + td + ';color:#555">' + esc(r.obs || '') + acaoCompilacao(r, horas) + '</td></tr>';
     });
     h += '<tr style="background:#FAF6EC;font-weight:700"><td style="' + td + '" colspan="4">Total</td><td style="' + td + ';text-align:center">' + totE + '</td>' +
       (horas ? '<td style="' + td + ';text-align:center">' + totH + '</td>' : '') + '<td style="' + td + '"></td></tr>';
