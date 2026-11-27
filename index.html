@@ -4414,6 +4414,45 @@ function renderCompilacao() {
   // 2) Pioneiros Regulares e 3) Pioneiros Auxiliares: listas unicas, sem grupo
   html += quadro('🟤 Pioneiros Regulares', rel.filter(function(r) { return r.categoria === 'Regular'; }), true);
   html += quadro('🟢 Pioneiros Auxiliares', rel.filter(ehAux), true);
+
+  // 4) Quem NAO entregou: aparece depois do prazo (dia 10 do mes seguinte), no mesmo formato
+  var prazo = prazoDoMes(compMes.ano, compMes.mes);
+  var pzTxt = String(prazo.getDate()).padStart(2, '0') + '/' + String(prazo.getMonth() + 1).padStart(2, '0');
+  html += '<div class="section-divider" style="margin-top:34px;color:var(--red)">⛔ Não entregaram até ' + pzTxt + '</div>';
+  if (new Date() <= prazo) {
+    html += '<div style="color:#888;font-size:13px;padding:6px 2px 10px">Ainda dentro do prazo. A lista de quem não entregou aparece aqui depois do dia ' + pzTxt + '.</div>';
+  } else {
+    var enviaram = new Set(rel.map(function(r) { return idNum(r.id); }));
+    var CH = mapaChegadas(), mesIdx = compMes.ano * 12 + compMes.mes;
+    var faltam = [];
+    Object.keys(MEMBROS).forEach(function(g) {
+      (MEMBROS[g] || []).forEach(function(m) {
+        if (enviaram.has(idNum(m.id))) return;
+        var ch = CH[String(parseInt(m.id))];
+        if (ch !== undefined && ch > mesIdx) return; // ainda nao era da congregacao
+        faltam.push({ nome: m.nome, grupo: g, cat: m.cat || 'Publicador' });
+      });
+    });
+    var tabelaFaltam = function(titulo, lista) {
+      var h = '<div style="font-family:\'Cormorant Garamond\',serif;font-size:19px;font-weight:600;margin:14px 0 6px">' + titulo + ' <span style="font-size:14px;color:#888;font-family:\'DM Sans\',sans-serif">(' + lista.length + ')</span></div>';
+      if (!lista.length) return h + '<div style="color:var(--sage);font-size:13px;padding:2px 2px 8px">✅ Todos entregaram.</div>';
+      h += '<div style="overflow-x:auto;border:1px solid #E8C4BE;border-radius:10px;background:white"><table style="width:100%;border-collapse:collapse"><thead><tr>' +
+        '<th style="' + th + ';background:#8E2F22;width:36px">#</th><th style="' + th + ';background:#8E2F22">Nome</th></tr></thead><tbody>';
+      lista.forEach(function(m, i) {
+        h += '<tr><td style="' + td + ';color:#999">' + (i + 1) + '</td><td style="' + td + ';font-weight:600;color:var(--red)">' + esc(m.nome) + '</td></tr>';
+      });
+      return h + '</tbody></table></div>';
+    };
+    if (!faltam.length) html += '<div style="color:var(--sage);font-size:14px;padding:6px 2px 10px">✅ Todos entregaram o relatório deste mês.</div>';
+    else {
+      Object.keys(MEMBROS).forEach(function(g) {
+        var l = faltam.filter(function(m) { return m.grupo === g && m.cat !== 'Regular'; });
+        if (l.length) html += tabelaFaltam('📍 Grupo ' + esc(g), l);
+      });
+      var reg = faltam.filter(function(m) { return m.cat === 'Regular'; });
+      if (reg.length) html += tabelaFaltam('🟤 Pioneiros Regulares', reg);
+    }
+  }
   document.getElementById('compConteudo').innerHTML = html;
 }
 
