@@ -1346,6 +1346,7 @@
   <div class="admin-tabs">
     <button class="admin-tab active" onclick="switchAdminTab('resumo')">📊 Resumo</button>
     <button class="admin-tab" onclick="switchAdminTab('historico')">📅 Histórico</button>
+    <button class="admin-tab" onclick="switchAdminTab('compilacao')">🧾 Compilação</button>
     <button class="admin-tab" onclick="switchAdminTab('publicadores')">👥 Publicadores</button>
     <button class="admin-tab" onclick="switchAdminTab('administracao')">⚙️ Anciãos</button>
     <button class="admin-tab" onclick="switchAdminTab('s21')">📋 S-21</button>
@@ -1480,6 +1481,18 @@
   <div id="memberList"></div>
 
   </div><!-- end tab-resumo -->
+
+  <!-- TAB: COMPILACAO -->
+  <div class="admin-tab-screen" id="tab-compilacao">
+    <div style="padding-top:16px"></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+      <button type="button" onclick="compMudarMes(-1)" aria-label="Mês anterior" style="width:40px;height:40px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:18px;cursor:pointer">‹</button>
+      <div id="compMesLabel" style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;min-width:200px;text-align:center"></div>
+      <button type="button" onclick="compMudarMes(1)" aria-label="Próximo mês" style="width:40px;height:40px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:18px;cursor:pointer">›</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px">Na ordem em que os relatórios chegaram: o mais antigo fica em cima e cada novo envio entra embaixo. Publicadores separados por grupo; pioneiros regulares e auxiliares em listas próprias.</div>
+    <div id="compConteudo"></div>
+  </div>
 
   <!-- TAB: HISTORICO -->
   <div class="admin-tab-screen" id="tab-historico">
@@ -4313,8 +4326,65 @@ function switchAdminTab(tab) {
   // Render specific tab content
   if (tab === 'resumo') { renderMesSeletor(); renderStats(); }
   if (tab === 'historico') { renderMesSeletorHist(); renderTable(); }
+  if (tab === 'compilacao') renderCompilacao();
   if (tab === 'publicadores') { reconstruirGrupoSelect(); renderMemberList(); }
   if (tab === 'administracao') { renderGerenciarGrupos(); carregarLinkSalvo(); }
+}
+
+// ============= COMPILACAO =============
+// Lista dos relatorios do mes na ORDEM DE CHEGADA, separada em tres quadros:
+// Pioneiros Regulares, Pioneiros Auxiliares e Publicadores (cada um no seu quadro).
+var compMes = null;
+function compMudarMes(passo) {
+  if (!compMes) compMes = mesRelatorioPadrao();
+  var d = new Date(compMes.ano, compMes.mes + passo, 1);
+  compMes = { ano: d.getFullYear(), mes: d.getMonth() };
+  renderCompilacao();
+}
+function renderCompilacao() {
+  if (!compMes) compMes = mesRelatorioPadrao();
+  var MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  document.getElementById('compMesLabel').textContent = MESES[compMes.mes] + ' de ' + compMes.ano;
+  var quando = function(r) { return new Date(r.enviadoEm || r.envio).getTime(); };
+  var rel = getRelatoriosDoMes(compMes.ano, compMes.mes).sort(function(a, b) { return quando(a) - quando(b); });
+  var fmtData = function(r) { var d = new Date(r.enviadoEm || r.envio); return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear(); };
+  var sim = function(r) { var p = r.participou === true || r.participou === 'true'; return p ? '<span style="color:var(--sage);font-weight:700">O</span>' : '<span style="color:var(--red);font-weight:700">X</span>'; };
+  var ehAux = function(r) { return r.categoria === 'Auxiliar' || r.categoria === 'Pioneiro Auxiliar'; };
+  var th = 'padding:9px 10px;font-size:11px;letter-spacing:.5px;text-transform:uppercase;text-align:left;background:var(--ink);color:var(--cream);white-space:nowrap';
+  var td = 'padding:9px 10px;font-size:14px;border-bottom:1px solid var(--border);vertical-align:top';
+  function quadro(titulo, lista, horas) {
+    var h = '<div class="section-divider" style="margin-top:18px">' + titulo + ' <span style="font-size:14px;color:#888;font-family:\'DM Sans\',sans-serif">(' + lista.length + ')</span></div>';
+    if (!lista.length) return h + '<div style="color:#aaa;font-size:13px;padding:6px 2px 10px">Ninguém enviou ainda.</div>';
+    var totH = 0, totE = 0;
+    h += '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:white"><table style="width:100%;border-collapse:collapse;min-width:520px"><thead><tr>' +
+      '<th style="' + th + ';width:36px">#</th><th style="' + th + '">Data</th><th style="' + th + '">Nome</th>' +
+      '<th style="' + th + ';text-align:center">Participou</th><th style="' + th + ';text-align:center">Estudos</th>' +
+      (horas ? '<th style="' + th + ';text-align:center">Horas</th>' : '') + '<th style="' + th + '">Observação</th></tr></thead><tbody>';
+    lista.forEach(function(r, i) {
+      var hr = parseInt(r.horas) || 0, e = parseInt(r.estudos) || 0;
+      totH += hr; totE += e;
+      h += '<tr><td style="' + td + ';color:#999">' + (i + 1) + '</td><td style="' + td + ';white-space:nowrap">' + fmtData(r) + '</td>' +
+        '<td style="' + td + ';font-weight:600">' + esc(r.nome) + '</td>' +
+        '<td style="' + td + ';text-align:center">' + sim(r) + '</td><td style="' + td + ';text-align:center">' + (e || '') + '</td>' +
+        (horas ? '<td style="' + td + ';text-align:center">' + (hr || '') + '</td>' : '') +
+        '<td style="' + td + ';color:#555">' + esc(r.obs || '') + '</td></tr>';
+    });
+    h += '<tr style="background:#FAF6EC;font-weight:700"><td style="' + td + '" colspan="4">Total</td><td style="' + td + ';text-align:center">' + totE + '</td>' +
+      (horas ? '<td style="' + td + ';text-align:center">' + totH + '</td>' : '') + '<td style="' + td + '"></td></tr>';
+    return h + '</tbody></table></div>';
+  }
+  var html = '';
+  // 1) Publicadores: um quadro para cada grupo
+  var pubs = rel.filter(function(r) { return r.categoria !== 'Regular' && !ehAux(r); });
+  var grupos = Object.keys(MEMBROS);
+  pubs.forEach(function(r) { if (r.grupo && grupos.indexOf(r.grupo) < 0) grupos.push(r.grupo); });
+  grupos.forEach(function(g) { html += quadro('📍 Grupo ' + esc(g), pubs.filter(function(r) { return r.grupo === g; }), false); });
+  var semGrupo = pubs.filter(function(r) { return !r.grupo; });
+  if (semGrupo.length) html += quadro('📍 Sem grupo', semGrupo, false);
+  // 2) Pioneiros Regulares e 3) Pioneiros Auxiliares: listas unicas, sem grupo
+  html += quadro('🟤 Pioneiros Regulares', rel.filter(function(r) { return r.categoria === 'Regular'; }), true);
+  html += quadro('🟢 Pioneiros Auxiliares', rel.filter(ehAux), true);
+  document.getElementById('compConteudo').innerHTML = html;
 }
 
 function renderMesSeletorHist() {
